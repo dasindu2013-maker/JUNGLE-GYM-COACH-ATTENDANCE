@@ -84,7 +84,25 @@
       font-size: 38px;
       font-weight: bold;
     }
+.brand-logo {
+  display: block;
+  width: 150px;
+  max-height: 130px;
+  object-fit: contain;
+  margin: 0 auto;
+}
 
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
     .brand h1 {
       margin: 16px 0 5px;
       font-size: 27px;
@@ -297,6 +315,14 @@
     }
 
     @media (max-width: 600px) {
+      .header-logo {
+  width: 46px;
+  height: 46px;
+}
+
+.header-title h2 {
+  font-size: 17px;
+}
       .login-card {
         padding: 25px 20px;
       }
@@ -316,7 +342,11 @@
   <section id="loginScreen" class="login-wrapper">
     <div class="login-card">
       <div class="brand">
-        <div class="brand-icon">J</div>
+        <img
+  src="jungle-gym-logo.png"
+  alt="Jungle Gym Logo"
+  class="brand-logo"
+>
         <h1>Jungle Gym</h1>
         <p>Coach Attendance System</p>
       </div>
@@ -337,10 +367,18 @@
   <section id="appScreen" class="hidden">
     <header>
       <div class="header-content">
-        <div class="header-title">
-          <h2>JUNGLE GYM</h2>
-          <small>Coach Attendance</small>
-        </div>
+        <div class="header-brand">
+  <img
+    src="jungle-gym-logo.png"
+    alt="Jungle Gym Logo"
+    class="header-logo"
+  >
+
+  <div class="header-title">
+    <h2>JUNGLE GYM</h2>
+    <small>Coach Attendance</small>
+  </div>
+</div>
         <button id="logoutButton" class="logout-button">Log Out</button>
       </div>
     </header>
