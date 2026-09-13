@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jungle Gym Coach Attendance</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --green: #65d33c;
+      --dark-green: #234f20;
+      --black: #101310;
+      --card: #1a1f1a;
+      --muted: #aeb8ae;
+      --red: #ef5350;
+      --yellow: #ffc02;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(circle at top right, #244a21 0, transparent 35%),
+        linear-gradient(145deg, #090c09, #151c15);
+      color: white;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .container {
+      width: min(1100px, 92%);
+      margin: auto;
+      padding: 25px 0;
+    }
+
+    .login-wrapper {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      width: min(420px, 100%);
+      padding: 35px;
+      background: rgba(25, 31, 25, 0.96);
+      border: 1px solid rgba(101, 211, 60, 0.3);
+      border-radius: 22px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .brand-icon {
+      width: 78px;
+      height: 78px;
+      margin: auto;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--green);
+      color: #0b100a;
+      font-size: 38px;
+      font-weight: bold;
+    }
+
+    .brand h1 {
+      margin: 16px 0 5px;
+      font-size: 27px;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 7px;
+      font-size: 14px;
+      color: #dce5dc;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      color: white;
+      background: #0e120e;
+      border: 1px solid #394339;
+      border-radius: 10px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--green);
+    }
+
+    .primary-button,
+    .check-button,
+    .checkout-button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 15px;
+      border: 0;
+      border-radius: 11px;
+      font-weight: bold;
+    }
+
+    .primary-button,
+    .check-button {
+      background: var(--green);
+      color: #0b100a;
+    }
+
+    .checkout-button {
+      background: var(--red);
+      color: white;
+    }
+
+    .message {
+      display: none;
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 9px;
+      font-size: 14px;
+    }
+
+    .message.error {
+      display: block;
+      background: rgba(239, 83, 80, 0.15);
+      color: #ffaaa8;
+      border: 1px solid rgba(239, 83, 80, 0.4);
+    }
+
+    .message.success {
+      display: block;
+      background: rgba(101, 211, 60, 0.14);
+      color: #baff9f;
+      border: 1px solid rgba(101, 211, 60, 0.35);
+    }
+
+    header {
+      padding: 17px 0;
+      background: rgba(9, 12, 9, 0.92);
+      border-bottom: 1px solid #2b342b;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-content {
+      width: min(1100px, 92%);
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+    }
+
+    .header-title h2 {
+      margin: 0;
+      color: var(--green);
+    }
+
+    .header-title small {
+      color: var(--muted);
+    }
+
+    .logout-button {
+      padding: 9px 15px;
+      border: 1px solid #596359;
+      border-radius: 8px;
+      color: white;
+      background: transparent;
+    }
+
+    .welcome {
+      margin: 8px 0 22px;
+    }
+
+    .welcome h1 {
+      margin-bottom: 5px;
+    }
+
+    .welcome p {
+      margin-top: 0;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-bottom: 22px;
+    }
+
+    .card {
+      padding: 21px;
+      background: rgba(26, 31, 26, 0.95);
+      border: 1px solid #303a30;
+      border-radius: 16px;
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .stat-number {
+      margin: 8px 0 0;
+      font-size: 34px;
+      color: var(--green);
+      font-weight: bold;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-weight: bold;
+    }
+
+    .checked-in {
+      color: #baff9f;
+      background: rgba(101, 211, 60, 0.15);
+    }
+
+    .checked-out {
+      color: #ccd4cc;
+      background: rgba(174, 184, 174, 0.13);
+    }
+
+    .location-text {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .table-card {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+
+    th,
+    td {
+      padding: 13px 10px;
+      border-bottom: 1px solid #333d33;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      color: var(--green);
+    }
+
+    td {
+      color: #dce5dc;
+    }
+
+    .map-link {
+      color: var(--green);
+      text-decoration: none;
+    }
+
+    .refresh-button {
+      padding: 9px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--green);
+      color: #101310;
+      font-weight: bold;
+    }
+
+    @media (max-width: 600px) {
+      .login-card {
+        padding: 25px 20px;
+      }
+
+      .header-title h2 {
+        font-size: 18px;
+      }
+
+      .welcome h1 {
+        font-size: 25px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <section id="loginScreen" class="login-wrapper">
+    <div class="login-card">
+      <div class="brand">
+        <div class="brand-icon">J</div>
+        <h1>Jungle Gym</h1>
+        <p>Coach Attendance System</p>
+      </div>
+
+      <form id="loginForm">
+        <label for="email">Email address</label>
+        <input id="email" type="email" required autocomplete="email">
+
+        <label for="password">Password</label>
+        <input id="password" type="password" required autocomplete="current-password">
+
+        <button class="primary-button" type="submit">Sign In</button>
+        <div id="loginMessage" class="message"></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="appScreen" class="hidden">
+    <header>
+      <div class="header-content">
+        <div class="header-title">
+          <h2>JUNGLE GYM</h2>
+          <small>Coach Attendance</small>
+        </div>
+        <button id="logoutButton" class="logout-button">Log Out</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <div class="welcome">
+        <h1 id="welcomeName">Welcome</h1>
+        <p id="currentDate"></p>
+      </div>
+
+      <div id="coachDashboard" class="hidden">
+        <div class="grid">
+          <div class="card">
+            <h3>Attendance Status</h3>
+            <span id="coachStatus" class="status-pill checked-out">
+              Checked Out
+            </span>
+            <p id="sessionTime" class="location-text"></p>
+          </div>
+
+          <div class="card">
+            <h3>Location</h3>
+            <p id="locationStatus" class="location-text">
+              Your location will be checked when marking attendance.
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Mark Attendance</h3>
+          <p class="location-text">
+            You must allow location access and be within the permitted
+            distance from Jungle Gym.
+          </p>
+
+          <button id="checkInButton" class="check-button">Check In</button>
+          <button id="checkOutButton" class="checkout-button hidden">
+            Check Out
+          </button>
+
+          <div id="attendanceMessage" class="message"></div>
+        </div>
+
+        <div class="card table-card" style="margin-top: 20px;">
+          <h3>My Recent Attendance</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Check In</th>
+                <th>Check Out</th>
+                <th>Worked</th>
+              </tr>
+            </thead>
+            <tbody id="coachHistoryBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="adminDashboard" class="hidden">
+        <div class="grid">
+          <div class="card">
+            <h3>Total Coaches</h3>
+            <p id="totalCoaches" class="stat-number">0</p>
+          </div>
+
+          <div class="card">
+            <h3>Currently Checked In</h3>
+            <p id="checkedInCount" class="stat-number">0</p>
+          </div>
+
+          <div class="card">
+            <h3>Attendance Today</h3>
+            <p id="todayCount" class="stat-number">0</p>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <h3>Live Coach Status</h3>
+            <button id="refreshButton" class="refresh-button">Refresh</button>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Coach</th>
+                <th>Status</th>
+                <th>Check In</th>
+                <th>Latest Location</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="liveStatusBody"></tbody>
+          </table>
+        </div>
+
+        <div class="card table-card" style="margin-top:20px;">
+          <h3>Recent Attendance Records</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Coach</th>
+                <th>Date</th>
+                <th>Check In</th>
+                <th>Check Out</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="adminHistoryBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <script>
+    const SUPABASE_URL =
+      "https://ucdsahpfllanlqxfcjjk.supabase.co";
+
+    const SUPABASE_KEY =
+      "sb_publishable_vcXp8NtRACdZb6OfDefdtg_NBXC6vLZ";
+
+    const db = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
+    let currentUser = null;
+    let currentProfile = null;
+    let openAttendance = null;
+    let locationWatcher = null;
+
+    const loginScreen = document.getElementById("loginScreen");
+    const appScreen = document.getElementById("appScreen");
+    const coachDashboard = document.getElementById("coachDashboard");
+    const adminDashboard = document.getElementById("adminDashboard");
+
+    function showMessage(element, text, type) {
+      element.textContent = text;
+      element.className = `message ${type}`;
+    }
+
+    function clearMessage(element) {
+      element.textContent = "";
+      element.className = "message";
+    }
+
+    function formatDateTime(value) {
+      if (!value) return "—";
+
+      return new Date(value).toLocaleString("en-LK", {
+        timeZone: "Asia/Colombo",
+        dateStyle: "medium",
+        timeStyle: "short"
+      });
+    }
+
+    function formatTime(value) {
+      if (!value) return "—";
+
+      return new Date(value).toLocaleTimeString("en-LK", {
+        timeZone: "Asia/Colombo",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+
+    function formatMinutes(minutes) {
+      if (minutes === null || minutes === undefined) return "—";
+
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+
+      return `${hours}h ${remainingMinutes}m`;
+    }
+
+    function distanceInMeters(lat1, lon1, lat2, lon2) {
+      const earthRadius = 6371000;
+      const toRadians = value => value * Math.PI / 180;
+
+      const latitudeDifference = toRadians(lat2 - lat1);
+      const longitudeDifference = toRadians(lon2 - lon1);
+
+      const a =
+        Math.sin(latitudeDifference / 2) ** 2 +
+        Math.cos(toRadians(lat1)) *
+        Math.cos(toRadians(lat2)) *
+        Math.sin(longitudeDifference / 2) ** 2;
+
+      return earthRadius * 2 * Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+      );
+    }
+
+    function getCurrentPosition() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Location is not supported by this device."));
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 0
+          }
+        );
+      });
+    }
+
+    async function initializeApp() {
+      const {
+        data: { session }
+      } = await db.auth.getSession();
+
+      if (!session) {
+        showLogin();
+        return;
+      }
+
+      currentUser = session.user;
+
+      const { data: profile, error } = await db
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .single();
+
+      if (error || !profile) {
+        alert("Profile could not be loaded.");
+        await db.auth.signOut();
+        showLogin();
+        return;
+      }
+
+      currentProfile = profile;
+
+      if (!profile.active) {
+        alert("Your account is inactive. Please contact the administrator.");
+        await db.auth.signOut();
+        showLogin();
+        return;
+      }
+
+      showApplication();
+
+      if (profile.role === "admin") {
+        adminDashboard.classList.remove("hidden");
+        coachDashboard.classList.add("hidden");
+        await loadAdminDashboard();
+      } else {
+        coachDashboard.classList.remove("hidden");
+        adminDashboard.classList.add("hidden");
+        await loadCoachDashboard();
+      }
+    }
+
+    function showLogin() {
+      loginScreen.classList.remove("hidden");
+      appScreen.classList.add("hidden");
+    }
+
+    function showApplication() {
+      loginScreen.classList.add("hidden");
+      appScreen.classList.remove("hidden");
+
+      document.getElementById("welcomeName").textContent =
+        `Welcome, ${currentProfile.full_name}`;
+
+      document.getElementById("currentDate").textContent =
+        new Date().toLocaleDateString("en-LK", {
+          timeZone: "Asia/Colombo",
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric"
+        });
+    }
+
+    document.getElementById("loginForm").addEventListener(
+      "submit",
+      async event => {
+        event.preventDefault();
+
+        const message = document.getElementById("loginMessage");
+        clearMessage(message);
+
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+
+        const { error } = await db.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) {
+          showMessage(message, error.message, "error");
+          return;
+        }
+
+        await initializeApp();
+      }
+    );
+
+    document.getElementById("logoutButton").addEventListener(
+      "click",
+      async () => {
+        if (locationWatcher !== null) {
+          navigator.geolocation.clearWatch(locationWatcher);
+          locationWatcher = null;
+        }
+
+        await db.auth.signOut();
+        currentUser = null;
+        currentProfile = null;
+        openAttendance = null;
+        showLogin();
+      }
+    );
+
+    async function loadCoachDashboard() {
+      const { data } = await db
+        .from("attendance")
+        .select("*")
+        .eq("coach_id", currentUser.id)
+        .is("check_out_time", null)
+        .maybeSingle();
+
+      openAttendance = data || null;
+      updateCoachStatus();
+      await loadCoachHistory();
+
+      if (openAttendance) {
+        startLiveLocationTracking();
+      }
+    }
+
+    function updateCoachStatus() {
+      const status = document.getElementById("coachStatus");
+      const checkInButton = document.getElementById("checkInButton");
+      const checkOutButton = document.getElementById("checkOutButton");
+      const sessionTime = document.getElementById("sessionTime");
+
+      if (openAttendance) {
+        status.textContent = "Checked In";
+        status.className = "status-pill checked-in";
+        checkInButton.classList.add("hidden");
+        checkOutButton.classList.remove("hidden");
+        sessionTime.textContent =
+          `Checked in: ${formatDateTime(openAttendance.check_in_time)}`;
+      } else {
+        status.textContent = "Checked Out";
+        status.className = "status-pill checked-out";
+        checkInButton.classList.remove("hidden");
+        checkOutButton.classList.add("hidden");
+        sessionTime.textContent = "No active attendance session.";
+      }
+    }
+
+    async function getVerifiedGymLocation() {
+      const position = await getCurrentPosition();
+
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+      const accuracy = position.coords.accuracy;
+
+      const { data: settings, error } = await db
+        .from("gym_settings")
+        .select("*")
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+
+      const distance = distanceInMeters(
+        latitude,
+        longitude,
+        settings.latitude,
+        settings.longitude
+      );
+
+      document.getElementById("locationStatus").textContent =
+        `Distance from gym: ${Math.round(distance)} metres. ` +
+        `GPS accuracy: approximately ${Math.round(accuracy)} metres.`;
+
+      if (distance > settings.allowed_radius_meters) {
+        throw new Error(
+          `You are approximately ${Math.round(distance)} metres from ` +
+          `Jungle Gym. You must be within ` +
+          `${settings.allowed_radius_meters} metres.`
+        );
+      }
+
+      return { latitude, longitude, accuracy };
+    }
+
+    document.getElementById("checkInButton").addEventListener(
+      "click",
+      async () => {
+        const message = document.getElementById("attendanceMessage");
+        clearMessage(message);
+
+        try {
+          showMessage(message, "Checking your location...", "success");
+
+          const location = await getVerifiedGymLocation();
+
+          const { data, error } = await db
+            .from("attendance")
+            .insert({
+              coach_id: currentUser.id,
+              check_in_latitude: location.latitude,
+              check_in_longitude: location.longitude,
+              check_in_accuracy: location.accuracy,
+              status: "checked_in"
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          openAttendance = data;
+
+          await saveLiveLocation(location);
+          updateCoachStatus();
+          startLiveLocationTracking();
+          await loadCoachHistory();
+
+          showMessage(
+            message,
+            "Check-in recorded successfully.",
+            "success"
+          );
+        } catch (error) {
+          showMessage(
+            message,
+            error.message || "Unable to check in.",
+            "error"
+          );
+        }
+      }
+    );
+
+    document.getElementById("checkOutButton").addEventListener(
+      "click",
+      async () => {
+        const message = document.getElementById("attendanceMessage");
+        clearMessage(message);
+
+        try {
+          showMessage(message, "Checking your location...", "success");
+
+          const location = await getVerifiedGymLocation();
+          const checkoutTime = new Date();
+          const checkinTime = new Date(openAttendance.check_in_time);
+
+          const totalMinutes = Math.max(
+            0,
+            Math.round((checkoutTime - checkinTime) / 60000)
+          );
+
+          const { error } = await db
+            .from("attendance")
+            .update({
+              check_out_time: checkoutTime.toISOString(),
+              check_out_latitude: location.latitude,
+              check_out_longitude: location.longitude,
+              check_out_accuracy: location.accuracy,
+              total_minutes: totalMinutes,
+              status: "checked_out"
+            })
+            .eq("id", openAttendance.id);
+
+          if (error) throw error;
+
+          if (locationWatcher !== null) {
+            navigator.geolocation.clearWatch(locationWatcher);
+            locationWatcher = null;
+          }
+
+          openAttendance = null;
+          updateCoachStatus();
+          await loadCoachHistory();
+
+          showMessage(
+            message,
+            "Check-out recorded successfully.",
+            "success"
+          );
+        } catch (error) {
+          showMessage(
+            message,
+            error.message || "Unable to check out.",
+            "error"
+          );
+        }
+      }
+    );
+
+    async function saveLiveLocation(location) {
+      await db
+        .from("live_locations")
+        .upsert({
+          coach_id: currentUser.id,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy,
+          updated_at: new Date().toISOString()
+        });
+    }
+
+    function startLiveLocationTracking() {
+      if (locationWatcher !== null || !navigator.geolocation) return;
+
+      locationWatcher = navigator.geolocation.watchPosition(
+        async position => {
+          if (!openAttendance) return;
+
+          await saveLiveLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+        },
+        error => {
+          document.getElementById("locationStatus").textContent =
+            `Live location warning: ${error.message}`;
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 60000,
+          timeout: 20000
+        }
+      );
+    }
+
+    async function loadCoachHistory() {
+      const { data } = await db
+        .from("attendance")
+        .select("*")
+        .eq("coach_id", currentUser.id)
+        .order("check_in_time", { ascending: false })
+        .limit(30);
+
+      document.getElementById("coachHistoryBody").innerHTML =
+        (data || []).map(record => `
+          <tr>
+            <td>${formatDateTime(record.check_in_time)}</td>
+            <td>${formatTime(record.check_in_time)}</td>
+            <td>${formatTime(record.check_out_time)}</td>
+            <td>${formatMinutes(record.total_minutes)}</td>
+          </tr>
+        `).join("") || `
+          <tr>
+            <td colspan="4">No attendance records yet.</td>
+          </tr>
+        `;
+    }
+
+    async function loadAdminDashboard() {
+      const [
+        profilesResult,
+        attendanceResult,
+        locationsResult
+      ] = await Promise.all([
+        db.from("profiles").select("*").eq("role", "coach"),
+        db.from("attendance")
+          .select("*, profiles(full_name)")
+          .order("check_in_time", { ascending: false })
+          .limit(100),
+        db.from("live_locations")
+          .select("*, profiles(full_name)")
+      ]);
+
+      const coaches = profilesResult.data || [];
+      const attendance = attendanceResult.data || [];
+      const locations = locationsResult.data || [];
+
+      const openRecords = attendance.filter(
+        record => !record.check_out_time
+      );
+
+      const todayInSriLanka = new Date().toLocaleDateString(
+        "en-CA",
+        { timeZone: "Asia/Colombo" }
+      );
+
+      const todaysRecords = attendance.filter(record => {
+        const recordDate = new Date(record.check_in_time)
+          .toLocaleDateString("en-CA", {
+            timeZone: "Asia/Colombo"
+          });
+
+        return recordDate === todayInSriLanka;
+      });
+
+      document.getElementById("totalCoaches").textContent =
+        coaches.length;
+
+      document.getElementById("checkedInCount").textContent =
+        openRecords.length;
+
+      document.getElementById("todayCount").textContent =
+        todaysRecords.length;
+
+      document.getElementById("liveStatusBody").innerHTML =
+        coaches.map(coach => {
+          const openRecord = openRecords.find(
+            record => record.coach_id === coach.id
+          );
+
+          const location = locations.find(
+            item => item.coach_id === coach.id
+          );
+
+          const locationLink = location
+            ? `<a class="map-link" target="_blank"
+                href="https://www.google.com/maps?q=${location.latitude},${location.longitude}">
+                View Map
+              </a>`
+            : "No location";
+
+          return `
+            <tr>
+              <td>${coach.full_name}</td>
+              <td>
+                <span class="status-pill ${
+                  openRecord ? "checked-in" : "checked-out"
+                }">
+                  ${openRecord ? "Checked In" : "Checked Out"}
+                </span>
+              </td>
+              <td>
+                ${openRecord
+                  ? formatDateTime(openRecord.check_in_time)
+                  : "—"}
+              </td>
+              <td>${locationLink}</td>
+              <td>
+                ${location
+                  ? formatDateTime(location.updated_at)
+                  : "—"}
+              </td>
+            </tr>
+          `;
+        }).join("") || `
+          <tr>
+            <td colspan="5">No coach accounts created yet.</td>
+          </tr>
+        `;
+
+      document.getElementById("adminHistoryBody").innerHTML =
+        attendance.map(record => `
+          <tr>
+            <td>${record.profiles?.full_name || "Unknown"}</td>
+            <td>${formatDateTime(record.check_in_time)}</td>
+            <td>${formatTime(record.check_in_time)}</td>
+            <td>${formatTime(record.check_out_time)}</td>
+            <td>${formatMinutes(record.total_minutes)}</td>
+          </tr>
+        `).join("") || `
+          <tr>
+            <td colspan="5">No attendance records yet.</td>
+          </tr>
+        `;
+    }
+
+    document.getElementById("refreshButton").addEventListener(
+      "click",
+      loadAdminDashboard
+    );
+
+    db.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        showLogin();
+      }
+    });
+
+    initializeApp();
+  </script>
+</body>
+</html>
