@@ -33,7 +33,8 @@
     }
 
     button,
-    input {
+    input,
+    select {
       font: inherit;
     }
 
@@ -314,6 +315,68 @@
       font-weight: bold;
     }
 
+    .report-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      align-items: end;
+      margin: 15px 0 20px;
+    }
+
+    .report-controls input,
+    .report-controls select {
+      width: 100%;
+      padding: 12px;
+      color: white;
+      background: #0e120e;
+      border: 1px solid #394339;
+      border-radius: 10px;
+    }
+
+    .report-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .warning-text {
+      color: #ffb3b1;
+      font-weight: bold;
+    }
+
+    @media print {
+      body {
+        background: white;
+        color: black;
+      }
+
+      header,
+      .welcome,
+      #adminDashboard > .grid,
+      #adminDashboard > .table-card,
+      .no-print {
+        display: none !important;
+      }
+
+      #monthlyReportCard {
+        display: block !important;
+        color: black;
+        background: white;
+        border: 0;
+        padding: 0;
+      }
+
+      #monthlyReportCard td,
+      #monthlyReportCard th {
+        color: black;
+        border-color: #bbb;
+      }
+
+      #monthlyReportCard th {
+        font-weight: bold;
+      }
+    }
+
     @media (max-width: 600px) {
       .header-logo {
   width: 46px;
@@ -491,6 +554,92 @@
             <tbody id="adminHistoryBody"></tbody>
           </table>
         </div>
+
+        <div id="monthlyReportCard" class="card" style="margin-top:20px;">
+          <div class="no-print">
+            <h3>Monthly Coach Report</h3>
+            <p class="location-text">
+              Select a month and coach, then download the report for Excel or print it as a PDF.
+            </p>
+
+            <div class="report-controls">
+              <div>
+                <label for="reportMonth">Month</label>
+                <input id="reportMonth" type="month">
+              </div>
+
+              <div>
+                <label for="reportCoach">Coach</label>
+                <select id="reportCoach">
+                  <option value="all">All Coaches</option>
+                </select>
+              </div>
+
+              <div class="report-actions">
+                <button id="downloadCsvButton" class="refresh-button">
+                  Download CSV
+                </button>
+                <button id="printReportButton" class="logout-button">
+                  Print / Save PDF
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <h3 id="reportTitle">Monthly Attendance Report</h3>
+
+          <div class="grid">
+            <div class="card">
+              <h3>Days Attended</h3>
+              <p id="reportDays" class="stat-number">0</p>
+            </div>
+            <div class="card">
+              <h3>Total Sessions</h3>
+              <p id="reportSessions" class="stat-number">0</p>
+            </div>
+            <div class="card">
+              <h3>Total Hours</h3>
+              <p id="reportHours" class="stat-number">0h 0m</p>
+            </div>
+            <div class="card">
+              <h3>Missing Checkouts</h3>
+              <p id="reportMissing" class="stat-number">0</p>
+            </div>
+          </div>
+
+          <div class="table-card">
+            <h3>Coach Summary</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Coach</th>
+                  <th>Days</th>
+                  <th>Sessions</th>
+                  <th>Total Hours</th>
+                  <th>Missing Checkouts</th>
+                </tr>
+              </thead>
+              <tbody id="reportSummaryBody"></tbody>
+            </table>
+          </div>
+
+          <div class="table-card" style="margin-top:20px;">
+            <h3>Detailed Records</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Coach</th>
+                  <th>Date</th>
+                  <th>Check In</th>
+                  <th>Check Out</th>
+                  <th>Worked</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="monthlyReportBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </main>
   </section>
@@ -511,6 +660,8 @@
     let currentProfile = null;
     let openAttendance = null;
     let locationWatcher = null;
+    let adminCoaches = [];
+    let adminAttendance = [];
 
     const loginScreen = document.getElementById("loginScreen");
     const appScreen = document.getElementById("appScreen");
@@ -952,8 +1103,7 @@
         db.from("profiles").select("*").eq("role", "coach"),
         db.from("attendance")
           .select("*, profiles(full_name)")
-          .order("check_in_time", { ascending: false })
-          .limit(100),
+          .order("check_in_time", { ascending: false }),
         db.from("live_locations")
           .select("*, profiles(full_name)")
       ]);
@@ -961,6 +1111,9 @@
       const coaches = profilesResult.data || [];
       const attendance = attendanceResult.data || [];
       const locations = locationsResult.data || [];
+
+      adminCoaches = coaches;
+      adminAttendance = attendance;
 
       const openRecords = attendance.filter(
         record => !record.check_out_time
@@ -1049,7 +1202,243 @@
             <td colspan="5">No attendance records yet.</td>
           </tr>
         `;
+
+      initializeMonthlyReport();
     }
+
+    function colomboDateKey(value) {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Colombo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(new Date(value));
+
+      const values = Object.fromEntries(
+        parts.filter(part => part.type !== "literal")
+          .map(part => [part.type, part.value])
+      );
+
+      return `${values.year}-${values.month}-${values.day}`;
+    }
+
+    function selectedMonthlyRecords() {
+      const month = document.getElementById("reportMonth").value;
+      const coachId = document.getElementById("reportCoach").value;
+
+      return adminAttendance.filter(record => {
+        const matchesMonth = colomboDateKey(record.check_in_time)
+          .startsWith(month);
+        const matchesCoach =
+          coachId === "all" || record.coach_id === coachId;
+
+        return matchesMonth && matchesCoach;
+      });
+    }
+
+    function coachNameFor(record) {
+      return record.profiles?.full_name ||
+        adminCoaches.find(coach => coach.id === record.coach_id)?.full_name ||
+        "Unknown";
+    }
+
+    function summarizeRecords(records) {
+      const summaries = new Map();
+
+      records.forEach(record => {
+        const name = coachNameFor(record);
+
+        if (!summaries.has(record.coach_id)) {
+          summaries.set(record.coach_id, {
+            name,
+            dates: new Set(),
+            sessions: 0,
+            minutes: 0,
+            missing: 0
+          });
+        }
+
+        const summary = summaries.get(record.coach_id);
+        summary.dates.add(colomboDateKey(record.check_in_time));
+        summary.sessions += 1;
+        summary.minutes += Number(record.total_minutes || 0);
+
+        if (!record.check_out_time) {
+          summary.missing += 1;
+        }
+      });
+
+      return [...summaries.values()].sort(
+        (a, b) => a.name.localeCompare(b.name)
+      );
+    }
+
+    function initializeMonthlyReport() {
+      const monthInput = document.getElementById("reportMonth");
+      const coachSelect = document.getElementById("reportCoach");
+
+      if (!monthInput.value) {
+        monthInput.value = colomboDateKey(new Date()).slice(0, 7);
+      }
+
+      const selectedCoach = coachSelect.value || "all";
+      coachSelect.innerHTML =
+        '<option value="all">All Coaches</option>' +
+        adminCoaches.map(coach =>
+          `<option value="${coach.id}">${coach.full_name}</option>`
+        ).join("");
+
+      coachSelect.value =
+        [...coachSelect.options].some(option => option.value === selectedCoach)
+          ? selectedCoach
+          : "all";
+
+      renderMonthlyReport();
+    }
+
+    function renderMonthlyReport() {
+      const records = selectedMonthlyRecords();
+      const summaries = summarizeRecords(records);
+      const monthValue = document.getElementById("reportMonth").value;
+      const coachSelect = document.getElementById("reportCoach");
+      const coachName =
+        coachSelect.options[coachSelect.selectedIndex]?.text || "All Coaches";
+
+      const monthLabel = monthValue
+        ? new Date(`${monthValue}-01T00:00:00`).toLocaleDateString(
+            "en-LK",
+            { month: "long", year: "numeric" }
+          )
+        : "Selected Month";
+
+      const totalMinutes = records.reduce(
+        (sum, record) => sum + Number(record.total_minutes || 0),
+        0
+      );
+      const totalDays = new Set(
+        records.map(record =>
+          `${record.coach_id}-${colomboDateKey(record.check_in_time)}`
+        )
+      ).size;
+      const missing = records.filter(record => !record.check_out_time).length;
+
+      document.getElementById("reportTitle").textContent =
+        `${monthLabel} Attendance Report — ${coachName}`;
+      document.getElementById("reportDays").textContent = totalDays;
+      document.getElementById("reportSessions").textContent = records.length;
+      document.getElementById("reportHours").textContent =
+        formatMinutes(totalMinutes);
+      document.getElementById("reportMissing").textContent = missing;
+
+      document.getElementById("reportSummaryBody").innerHTML =
+        summaries.map(summary => `
+          <tr>
+            <td>${summary.name}</td>
+            <td>${summary.dates.size}</td>
+            <td>${summary.sessions}</td>
+            <td>${formatMinutes(summary.minutes)}</td>
+            <td class="${summary.missing ? "warning-text" : ""}">
+              ${summary.missing}
+            </td>
+          </tr>
+        `).join("") || `
+          <tr>
+            <td colspan="5">No attendance records for this selection.</td>
+          </tr>
+        `;
+
+      document.getElementById("monthlyReportBody").innerHTML =
+        records.map(record => `
+          <tr>
+            <td>${coachNameFor(record)}</td>
+            <td>${colomboDateKey(record.check_in_time)}</td>
+            <td>${formatTime(record.check_in_time)}</td>
+            <td>${formatTime(record.check_out_time)}</td>
+            <td>${formatMinutes(record.total_minutes)}</td>
+            <td class="${!record.check_out_time ? "warning-text" : ""}">
+              ${record.check_out_time ? "Complete" : "Missing checkout"}
+            </td>
+          </tr>
+        `).join("") || `
+          <tr>
+            <td colspan="6">No attendance records for this selection.</td>
+          </tr>
+        `;
+    }
+
+    function csvCell(value) {
+      return `"${String(value ?? "").replaceAll('"', '""')}"`;
+    }
+
+    function downloadMonthlyCsv() {
+      const records = selectedMonthlyRecords();
+      const summaries = summarizeRecords(records);
+      const month = document.getElementById("reportMonth").value || "report";
+
+      const rows = [
+        ["Jungle Gym Monthly Coach Attendance Report"],
+        ["Month", month],
+        [],
+        ["COACH SUMMARY"],
+        ["Coach", "Days Attended", "Sessions", "Total Minutes", "Total Hours", "Missing Checkouts"],
+        ...summaries.map(summary => [
+          summary.name,
+          summary.dates.size,
+          summary.sessions,
+          summary.minutes,
+          formatMinutes(summary.minutes),
+          summary.missing
+        ]),
+        [],
+        ["DETAILED RECORDS"],
+        ["Coach", "Date", "Check In", "Check Out", "Worked Minutes", "Worked", "Status"],
+        ...records.map(record => [
+          coachNameFor(record),
+          colomboDateKey(record.check_in_time),
+          formatTime(record.check_in_time),
+          formatTime(record.check_out_time),
+          record.total_minutes ?? "",
+          formatMinutes(record.total_minutes),
+          record.check_out_time ? "Complete" : "Missing checkout"
+        ])
+      ];
+
+      const csv = rows
+        .map(row => row.map(csvCell).join(","))
+        .join("\r\n");
+      const blob = new Blob(["\uFEFF" + csv], {
+        type: "text/csv;charset=utf-8"
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `jungle-gym-attendance-${month}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById("reportMonth").addEventListener(
+      "change",
+      renderMonthlyReport
+    );
+
+    document.getElementById("reportCoach").addEventListener(
+      "change",
+      renderMonthlyReport
+    );
+
+    document.getElementById("downloadCsvButton").addEventListener(
+      "click",
+      downloadMonthlyCsv
+    );
+
+    document.getElementById("printReportButton").addEventListener(
+      "click",
+      () => window.print()
+    );
 
     document.getElementById("refreshButton").addEventListener(
       "click",
