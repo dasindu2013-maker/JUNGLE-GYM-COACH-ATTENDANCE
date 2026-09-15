@@ -344,6 +344,43 @@
       font-weight: bold;
     }
 
+    .edit-button {
+      padding: 8px 12px;
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      background: rgba(101, 211, 60, 0.12);
+      color: var(--green);
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .correction-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      align-items: end;
+      margin-top: 15px;
+    }
+
+    .correction-form input {
+      width: 100%;
+    }
+
+    .correction-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .cancel-button {
+      padding: 12px 16px;
+      border: 1px solid #596359;
+      border-radius: 8px;
+      color: white;
+      background: transparent;
+      font-weight: bold;
+    }
+
     @media print {
       body {
         background: white;
@@ -549,10 +586,49 @@
                 <th>Check In</th>
                 <th>Check Out</th>
                 <th>Total</th>
+                <th>Admin Edit</th>
               </tr>
             </thead>
             <tbody id="adminHistoryBody"></tbody>
           </table>
+        </div>
+
+        <div id="correctionCard" class="card hidden" style="margin-top:20px;">
+          <h3>Correct Attendance Record</h3>
+          <p class="location-text">
+            Enter the coach's actual check-in and checkout times. The working
+            duration will be recalculated automatically.
+          </p>
+
+          <input id="editAttendanceId" type="hidden">
+
+          <div class="correction-form">
+            <div>
+              <label for="editCoachName">Coach</label>
+              <input id="editCoachName" type="text" readonly>
+            </div>
+
+            <div>
+              <label for="editCheckIn">Check-in time</label>
+              <input id="editCheckIn" type="datetime-local">
+            </div>
+
+            <div>
+              <label for="editCheckOut">Checkout time</label>
+              <input id="editCheckOut" type="datetime-local">
+            </div>
+
+            <div class="correction-actions">
+              <button id="saveCorrectionButton" class="refresh-button">
+                Save Correction
+              </button>
+              <button id="cancelCorrectionButton" class="cancel-button">
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div id="correctionMessage" class="message"></div>
         </div>
 
         <div id="monthlyReportCard" class="card" style="margin-top:20px;">
@@ -1194,17 +1270,152 @@
             <td>${record.profiles?.full_name || "Unknown"}</td>
             <td>${formatDateTime(record.check_in_time)}</td>
             <td>${formatTime(record.check_in_time)}</td>
-            <td>${formatTime(record.check_out_time)}</td>
+            <td class="${!record.check_out_time ? "warning-text" : ""}">
+              ${formatTime(record.check_out_time)}
+            </td>
             <td>${formatMinutes(record.total_minutes)}</td>
+            <td>
+              <button class="edit-button"
+                onclick="openAttendanceEditor('${record.id}')">
+                ${record.check_out_time ? "Edit" : "Fix Checkout"}
+              </button>
+            </td>
           </tr>
         `).join("") || `
           <tr>
-            <td colspan="5">No attendance records yet.</td>
+            <td colspan="6">No attendance records yet.</td>
           </tr>
         `;
 
       initializeMonthlyReport();
     }
+
+
+    function colomboInputValue(value) {
+      if (!value) return "";
+
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Colombo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+      }).formatToParts(new Date(value));
+
+      const values = Object.fromEntries(
+        parts.filter(part => part.type !== "literal")
+          .map(part => [part.type, part.value])
+      );
+
+      return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
+    }
+
+    function sriLankaInputToIso(value) {
+      if (!value) return null;
+      return new Date(`${value}:00+05:30`).toISOString();
+    }
+
+    window.openAttendanceEditor = function(recordId) {
+      const record = adminAttendance.find(
+        item => String(item.id) === String(recordId)
+      );
+
+      if (!record) return;
+
+      document.getElementById("editAttendanceId").value = record.id;
+      document.getElementById("editCoachName").value = coachNameFor(record);
+      document.getElementById("editCheckIn").value =
+        colomboInputValue(record.check_in_time);
+      document.getElementById("editCheckOut").value =
+        colomboInputValue(record.check_out_time);
+
+      clearMessage(document.getElementById("correctionMessage"));
+      const card = document.getElementById("correctionCard");
+      card.classList.remove("hidden");
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+
+    document.getElementById("cancelCorrectionButton").addEventListener(
+      "click",
+      () => {
+        document.getElementById("correctionCard").classList.add("hidden");
+        clearMessage(document.getElementById("correctionMessage"));
+      }
+    );
+
+    document.getElementById("saveCorrectionButton").addEventListener(
+      "click",
+      async () => {
+        const message = document.getElementById("correctionMessage");
+        clearMessage(message);
+
+        const recordId = document.getElementById("editAttendanceId").value;
+        const checkInValue = document.getElementById("editCheckIn").value;
+        const checkOutValue = document.getElementById("editCheckOut").value;
+
+        if (!checkInValue || !checkOutValue) {
+          showMessage(
+            message,
+            "Both check-in and checkout times are required.",
+            "error"
+          );
+          return;
+        }
+
+        const checkInIso = sriLankaInputToIso(checkInValue);
+        const checkOutIso = sriLankaInputToIso(checkOutValue);
+        const checkInDate = new Date(checkInIso);
+        const checkOutDate = new Date(checkOutIso);
+
+        if (checkOutDate <= checkInDate) {
+          showMessage(
+            message,
+            "Checkout time must be later than check-in time.",
+            "error"
+          );
+          return;
+        }
+
+        const totalMinutes = Math.round(
+          (checkOutDate - checkInDate) / 60000
+        );
+
+        showMessage(message, "Saving correction...", "success");
+
+        const { error } = await db
+          .from("attendance")
+          .update({
+            check_in_time: checkInIso,
+            check_out_time: checkOutIso,
+            total_minutes: totalMinutes,
+            status: "checked_out"
+          })
+          .eq("id", recordId);
+
+        if (error) {
+          showMessage(
+            message,
+            error.message || "Unable to save the correction.",
+            "error"
+          );
+          return;
+        }
+
+        showMessage(
+          message,
+          "Attendance corrected successfully. The coach can now check in again.",
+          "success"
+        );
+
+        await loadAdminDashboard();
+
+        setTimeout(() => {
+          document.getElementById("correctionCard").classList.add("hidden");
+        }, 1800);
+      }
+    );
 
     function colomboDateKey(value) {
       const parts = new Intl.DateTimeFormat("en-GB", {
