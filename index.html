@@ -362,8 +362,22 @@
       margin-top: 15px;
     }
 
-    .correction-form input {
+    .correction-form input,
+    .correction-form select {
       width: 100%;
+    }
+
+    .correction-form select {
+      padding: 14px;
+      color: white;
+      background: #0e120e;
+      border: 1px solid #394339;
+      border-radius: 10px;
+      outline: none;
+    }
+
+    .correction-form select:focus {
+      border-color: var(--green);
     }
 
     .correction-actions {
@@ -554,6 +568,36 @@
             <h3>Attendance Today</h3>
             <p id="todayCount" class="stat-number">0</p>
           </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3>Manual Coach Check-In</h3>
+          <p class="location-text">
+            Use this when an admin needs to start a coach's attendance session.
+            No GPS location is recorded for a manual check-in.
+          </p>
+
+          <div class="correction-form">
+            <div>
+              <label for="manualCoach">Coach</label>
+              <select id="manualCoach">
+                <option value="">Select a coach</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="manualCheckInTime">Check-in time</label>
+              <input id="manualCheckInTime" type="datetime-local">
+            </div>
+
+            <div>
+              <button id="manualCheckInButton" class="refresh-button">
+                Manual Check In
+              </button>
+            </div>
+          </div>
+
+          <div id="manualCheckInMessage" class="message"></div>
         </div>
 
         <div class="card table-card">
@@ -1287,6 +1331,7 @@
           </tr>
         `;
 
+      initializeManualCheckIn();
       initializeMonthlyReport();
     }
 
@@ -1316,6 +1361,119 @@
       if (!value) return null;
       return new Date(`${value}:00+05:30`).toISOString();
     }
+
+    function initializeManualCheckIn() {
+      const coachSelect = document.getElementById("manualCoach");
+      const selectedCoach = coachSelect.value;
+
+      coachSelect.innerHTML =
+        '<option value="">Select a coach</option>' +
+        adminCoaches
+          .filter(coach => coach.active !== false)
+          .sort((a, b) => a.full_name.localeCompare(b.full_name))
+          .map(coach =>
+            `<option value="${coach.id}">${coach.full_name}</option>`
+          ).join("");
+
+      if ([...coachSelect.options].some(
+        option => option.value === selectedCoach
+      )) {
+        coachSelect.value = selectedCoach;
+      }
+
+      const timeInput = document.getElementById("manualCheckInTime");
+
+      if (!timeInput.value) {
+        timeInput.value = colomboInputValue(new Date());
+      }
+    }
+
+    document.getElementById("manualCheckInButton").addEventListener(
+      "click",
+      async () => {
+        const message = document.getElementById("manualCheckInMessage");
+        clearMessage(message);
+
+        if (currentProfile?.role !== "admin") {
+          showMessage(message, "Only an admin can use this option.", "error");
+          return;
+        }
+
+        const coachId = document.getElementById("manualCoach").value;
+        const timeValue =
+          document.getElementById("manualCheckInTime").value;
+
+        if (!coachId || !timeValue) {
+          showMessage(
+            message,
+            "Select a coach and enter the check-in time.",
+            "error"
+          );
+          return;
+        }
+
+        const coach = adminCoaches.find(item => item.id === coachId);
+
+        if (!coach || coach.active === false) {
+          showMessage(message, "Please select an active coach.", "error");
+          return;
+        }
+
+        const alreadyOpen = adminAttendance.some(
+          record => record.coach_id === coachId && !record.check_out_time
+        );
+
+        if (alreadyOpen) {
+          showMessage(
+            message,
+            `${coach.full_name} is already checked in. Correct or close the existing session first.`,
+            "error"
+          );
+          return;
+        }
+
+        const checkInIso = sriLankaInputToIso(timeValue);
+
+        if (new Date(checkInIso) > new Date(Date.now() + 5 * 60000)) {
+          showMessage(
+            message,
+            "Check-in time cannot be in the future.",
+            "error"
+          );
+          return;
+        }
+
+        showMessage(message, "Creating check-in...", "success");
+
+        const { error } = await db
+          .from("attendance")
+          .insert({
+            coach_id: coachId,
+            check_in_time: checkInIso,
+            status: "checked_in"
+          });
+
+        if (error) {
+          const text = error.code === "23505"
+            ? "This coach already has an open attendance session."
+            : (error.message || "Unable to create the manual check-in.");
+
+          showMessage(message, text, "error");
+          return;
+        }
+
+        document.getElementById("manualCheckInTime").value =
+          colomboInputValue(new Date());
+
+        await loadAdminDashboard();
+
+        showMessage(
+          message,
+          `${coach.full_name} was checked in successfully by admin.`,
+          "success"
+        );
+      }
+    );
 
     window.openAttendanceEditor = function(recordId) {
       const record = adminAttendance.find(
