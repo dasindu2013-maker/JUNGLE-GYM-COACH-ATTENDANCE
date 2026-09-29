@@ -640,8 +640,8 @@
         <div id="correctionCard" class="card hidden" style="margin-top:20px;">
           <h3>Correct Attendance Record</h3>
           <p class="location-text">
-            Enter the coach's actual check-in and checkout times. The working
-            duration will be recalculated automatically.
+            Enter the coach's actual check-in and checkout times. Worked time
+            counts only 6:00 AM–12:00 PM and 2:00 PM–10:00 PM.
           </p>
 
           <input id="editAttendanceId" type="hidden">
@@ -679,7 +679,9 @@
           <div class="no-print">
             <h3>Monthly Coach Report</h3>
             <p class="location-text">
-              Select a month and coach, then download the report for Excel or print it as a PDF.
+              Select a month and coach, then download the report for Excel or
+              print it as a PDF. Hours count only gym operating time:
+              6:00 AM–12:00 PM and 2:00 PM–10:00 PM.
             </p>
 
             <div class="report-controls">
@@ -825,6 +827,58 @@
       const remainingMinutes = minutes % 60;
 
       return `${hours}h ${remainingMinutes}m`;
+    }
+
+    function calculateGymMinutes(checkInValue, checkOutValue) {
+      if (!checkInValue || !checkOutValue) return null;
+
+      const start = new Date(checkInValue).getTime();
+      const end = new Date(checkOutValue).getTime();
+
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+        return 0;
+      }
+
+      const firstDay = colomboDateKey(checkInValue);
+      const finalDay = colomboDateKey(checkOutValue);
+      const dayCursor = new Date(`${firstDay}T00:00:00Z`);
+      const lastDay = new Date(`${finalDay}T00:00:00Z`);
+      const operatingPeriods = [
+        ["06:00:00", "12:00:00"],
+        ["14:00:00", "22:00:00"]
+      ];
+      let countedMilliseconds = 0;
+
+      while (dayCursor <= lastDay) {
+        const dateKey = dayCursor.toISOString().slice(0, 10);
+
+        operatingPeriods.forEach(([openingTime, closingTime]) => {
+          const periodStart = new Date(
+            `${dateKey}T${openingTime}+05:30`
+          ).getTime();
+          const periodEnd = new Date(
+            `${dateKey}T${closingTime}+05:30`
+          ).getTime();
+
+          const overlapStart = Math.max(start, periodStart);
+          const overlapEnd = Math.min(end, periodEnd);
+
+          if (overlapEnd > overlapStart) {
+            countedMilliseconds += overlapEnd - overlapStart;
+          }
+        });
+
+        dayCursor.setUTCDate(dayCursor.getUTCDate() + 1);
+      }
+
+      return Math.round(countedMilliseconds / 60000);
+    }
+
+    function workedMinutesFor(record) {
+      return calculateGymMinutes(
+        record.check_in_time,
+        record.check_out_time
+      );
     }
 
     function distanceInMeters(lat1, lon1, lat2, lon2) {
@@ -1003,8 +1057,14 @@
         status.className = "status-pill checked-in";
         checkInButton.classList.add("hidden");
         checkOutButton.classList.remove("hidden");
+        const countedMinutes = calculateGymMinutes(
+          openAttendance.check_in_time,
+          new Date().toISOString()
+        );
+
         sessionTime.textContent =
-          `Checked in: ${formatDateTime(openAttendance.check_in_time)}`;
+          `Checked in: ${formatDateTime(openAttendance.check_in_time)} · ` +
+          `Counted gym time: ${formatMinutes(countedMinutes)}`;
       } else {
         status.textContent = "Checked Out";
         status.className = "status-pill checked-out";
@@ -1111,9 +1171,9 @@
           const checkoutTime = new Date();
           const checkinTime = new Date(openAttendance.check_in_time);
 
-          const totalMinutes = Math.max(
-            0,
-            Math.round((checkoutTime - checkinTime) / 60000)
+          const totalMinutes = calculateGymMinutes(
+            checkinTime,
+            checkoutTime
           );
 
           const { error } = await db
@@ -1205,7 +1265,7 @@
             <td>${formatDateTime(record.check_in_time)}</td>
             <td>${formatTime(record.check_in_time)}</td>
             <td>${formatTime(record.check_out_time)}</td>
-            <td>${formatMinutes(record.total_minutes)}</td>
+            <td>${formatMinutes(workedMinutesFor(record))}</td>
           </tr>
         `).join("") || `
           <tr>
@@ -1317,7 +1377,7 @@
             <td class="${!record.check_out_time ? "warning-text" : ""}">
               ${formatTime(record.check_out_time)}
             </td>
-            <td>${formatMinutes(record.total_minutes)}</td>
+            <td>${formatMinutes(workedMinutesFor(record))}</td>
             <td>
               <button class="edit-button"
                 onclick="openAttendanceEditor('${record.id}')">
@@ -1536,8 +1596,9 @@
           return;
         }
 
-        const totalMinutes = Math.round(
-          (checkOutDate - checkInDate) / 60000
+        const totalMinutes = calculateGymMinutes(
+          checkInDate,
+          checkOutDate
         );
 
         showMessage(message, "Saving correction...", "success");
@@ -1630,7 +1691,7 @@
         const summary = summaries.get(record.coach_id);
         summary.dates.add(colomboDateKey(record.check_in_time));
         summary.sessions += 1;
-        summary.minutes += Number(record.total_minutes || 0);
+        summary.minutes += Number(workedMinutesFor(record) || 0);
 
         if (!record.check_out_time) {
           summary.missing += 1;
@@ -1681,7 +1742,7 @@
         : "Selected Month";
 
       const totalMinutes = records.reduce(
-        (sum, record) => sum + Number(record.total_minutes || 0),
+        (sum, record) => sum + Number(workedMinutesFor(record) || 0),
         0
       );
       const totalDays = new Set(
@@ -1723,7 +1784,7 @@
             <td>${colomboDateKey(record.check_in_time)}</td>
             <td>${formatTime(record.check_in_time)}</td>
             <td>${formatTime(record.check_out_time)}</td>
-            <td>${formatMinutes(record.total_minutes)}</td>
+            <td>${formatMinutes(workedMinutesFor(record))}</td>
             <td class="${!record.check_out_time ? "warning-text" : ""}">
               ${record.check_out_time ? "Complete" : "Missing checkout"}
             </td>
@@ -1766,8 +1827,8 @@
           colomboDateKey(record.check_in_time),
           formatTime(record.check_in_time),
           formatTime(record.check_out_time),
-          record.total_minutes ?? "",
-          formatMinutes(record.total_minutes),
+          workedMinutesFor(record) ?? "",
+          formatMinutes(workedMinutesFor(record)),
           record.check_out_time ? "Complete" : "Missing checkout"
         ])
       ];
