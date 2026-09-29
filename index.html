@@ -395,36 +395,225 @@
       font-weight: bold;
     }
 
+    .report-document-header {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      padding: 18px 0;
+      margin-bottom: 18px;
+      border-bottom: 2px solid var(--green);
+    }
+
+    .report-document-logo {
+      width: 105px;
+      height: 105px;
+      object-fit: contain;
+      flex: 0 0 auto;
+    }
+
+    .report-document-heading h2 {
+      margin: 3px 0 7px;
+      font-size: 27px;
+    }
+
+    .report-document-heading p {
+      margin: 3px 0;
+      color: var(--muted);
+    }
+
+    .report-brand-name {
+      color: var(--green) !important;
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+    }
+
+    .report-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 14px;
+      margin-bottom: 18px;
+      background: #101510;
+      border: 1px solid #303a30;
+      border-radius: 10px;
+    }
+
+    .report-meta p {
+      margin: 0;
+      color: #dce5dc;
+      line-height: 1.6;
+    }
+
+    .report-meta strong {
+      display: block;
+      color: var(--green);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .report-hours-note {
+      padding: 10px 14px;
+      margin: 0 0 18px;
+      color: #dce5dc;
+      background: rgba(101, 211, 60, 0.08);
+      border-left: 4px solid var(--green);
+      font-size: 13px;
+    }
+
+    .report-signatures {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 90px;
+      margin: 60px 45px 15px;
+    }
+
+    .signature-line {
+      padding-top: 8px;
+      border-top: 1px solid #8b958b;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @page {
+      size: A4 landscape;
+      margin: 12mm;
+    }
+
     @media print {
+      html,
       body {
-        background: white;
-        color: black;
+        background: white !important;
+        color: black !important;
+      }
+
+      body {
+        min-height: auto;
       }
 
       header,
       .welcome,
-      #adminDashboard > .grid,
-      #adminDashboard > .table-card,
-      .no-print {
+      .no-print,
+      #coachDashboard {
+        display: none !important;
+      }
+
+      .container {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      #adminDashboard {
+        display: block !important;
+      }
+
+      #adminDashboard > * {
         display: none !important;
       }
 
       #monthlyReportCard {
         display: block !important;
-        color: black;
-        background: white;
-        border: 0;
-        padding: 0;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: black !important;
+        background: white !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+      }
+
+      .report-document-header {
+        padding-top: 0;
+        border-color: #2f7d23;
+      }
+
+      .report-document-logo {
+        width: 88px;
+        height: 88px;
+      }
+
+      .report-document-heading h2,
+      #reportTitle,
+      #monthlyReportCard h3 {
+        color: black !important;
+      }
+
+      .report-document-heading p,
+      .report-meta p,
+      .report-hours-note,
+      .signature-line {
+        color: #333 !important;
+      }
+
+      .report-brand-name,
+      .report-meta strong {
+        color: #2f7d23 !important;
+      }
+
+      .report-meta {
+        background: #f5f7f5 !important;
+        border-color: #bbb !important;
+      }
+
+      .report-hours-note {
+        background: #f3f8f1 !important;
+        border-color: #2f7d23 !important;
+      }
+
+      #monthlyReportCard .grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      #monthlyReportCard .card {
+        padding: 12px;
+        color: black !important;
+        background: #f7f8f7 !important;
+        border: 1px solid #bbb !important;
+        break-inside: avoid;
+      }
+
+      #monthlyReportCard .stat-number {
+        color: #2f7d23 !important;
+        font-size: 24px;
+      }
+
+      #monthlyReportCard .table-card {
+        overflow: visible;
+        break-inside: auto;
+      }
+
+      #monthlyReportCard table {
+        min-width: 0;
+        font-size: 9pt;
       }
 
       #monthlyReportCard td,
       #monthlyReportCard th {
-        color: black;
-        border-color: #bbb;
+        padding: 7px 6px;
+        color: black !important;
+        border-color: #bbb !important;
       }
 
       #monthlyReportCard th {
+        color: #1f5d18 !important;
+        background: #edf4ea !important;
         font-weight: bold;
+      }
+
+      #monthlyReportCard tr {
+        break-inside: avoid;
+      }
+
+      .warning-text {
+        color: #9a1f1c !important;
+      }
+
+      .report-signatures {
+        break-inside: avoid;
       }
     }
 
@@ -708,6 +897,40 @@
             </div>
           </div>
 
+          <div class="report-document-header">
+            <img
+              src="jungle-gym-logo.png"
+              alt="Jungle Gym Logo"
+              class="report-document-logo"
+            >
+            <div class="report-document-heading">
+              <p class="report-brand-name">JUNGLE GYM</p>
+              <h2>Monthly Coach Attendance Report</h2>
+              <p>Official attendance and working-hours statement</p>
+            </div>
+          </div>
+
+          <div class="report-meta">
+            <p>
+              <strong>Report Period</strong>
+              <span id="reportPeriod">—</span>
+            </p>
+            <p>
+              <strong>Coach</strong>
+              <span id="reportCoachName">All Coaches</span>
+            </p>
+            <p>
+              <strong>Generated On</strong>
+              <span id="reportGeneratedAt">—</span>
+            </p>
+          </div>
+
+          <p class="report-hours-note">
+            Working hours are calculated only during gym operating periods:
+            6:00 AM–12:00 PM and 2:00 PM–10:00 PM. The 12:00 PM–2:00 PM
+            closure and time outside operating hours are excluded.
+          </p>
+
           <h3 id="reportTitle">Monthly Attendance Report</h3>
 
           <div class="grid">
@@ -760,6 +983,11 @@
               </thead>
               <tbody id="monthlyReportBody"></tbody>
             </table>
+          </div>
+
+          <div class="report-signatures">
+            <div class="signature-line">Prepared by</div>
+            <div class="signature-line">Authorized by</div>
           </div>
         </div>
       </div>
@@ -1754,6 +1982,10 @@
 
       document.getElementById("reportTitle").textContent =
         `${monthLabel} Attendance Report — ${coachName}`;
+      document.getElementById("reportPeriod").textContent = monthLabel;
+      document.getElementById("reportCoachName").textContent = coachName;
+      document.getElementById("reportGeneratedAt").textContent =
+        formatDateTime(new Date());
       document.getElementById("reportDays").textContent = totalDays;
       document.getElementById("reportSessions").textContent = records.length;
       document.getElementById("reportHours").textContent =
