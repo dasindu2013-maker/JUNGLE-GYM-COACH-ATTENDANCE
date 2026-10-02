@@ -54,6 +54,48 @@
       padding: 25px 0;
     }
 
+    .admin-tabs {
+      display: flex;
+      gap: 10px;
+      margin: 0 0 22px;
+      padding: 8px;
+      position: sticky;
+      top: 92px;
+      z-index: 9;
+      overflow-x: auto;
+      background: rgba(9, 12, 9, 0.96);
+      border: 1px solid #303a30;
+      border-radius: 14px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+    }
+
+    .admin-tab-button {
+      flex: 1 0 auto;
+      min-width: 170px;
+      padding: 12px 16px;
+      border: 1px solid #465246;
+      border-radius: 10px;
+      background: #151b15;
+      color: #dce5dc;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .admin-tab-button:hover {
+      border-color: var(--green);
+      color: white;
+    }
+
+    .admin-tab-button.active {
+      background: var(--green);
+      border-color: var(--green);
+      color: #0b100a;
+    }
+
+    .admin-tab-pane {
+      scroll-margin-top: 165px;
+    }
+
     .login-wrapper {
       min-height: 100vh;
       display: grid;
@@ -552,6 +594,10 @@
         display: none !important;
       }
 
+      #monthlyReportAdminTab {
+        display: block !important;
+      }
+
       #monthlyReportCard {
         display: block !important;
         margin: 0 !important;
@@ -656,6 +702,18 @@
     }
 
     @media (max-width: 600px) {
+      .admin-tabs {
+        top: 78px;
+        gap: 7px;
+        padding: 7px;
+      }
+
+      .admin-tab-button {
+        min-width: 150px;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+
       .header-logo {
   width: 46px;
   height: 46px;
@@ -780,6 +838,37 @@
       </div>
 
       <div id="adminDashboard" class="hidden">
+        <div class="admin-tabs no-print" role="tablist" aria-label="Admin sections">
+          <button
+            id="attendanceTabButton"
+            class="admin-tab-button active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            onclick="setAdminTab('attendance')">
+            Attendance Dashboard
+          </button>
+          <button
+            id="payrollTabButton"
+            class="admin-tab-button"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            onclick="setAdminTab('payroll')">
+            Coach Payroll
+          </button>
+          <button
+            id="reportTabButton"
+            class="admin-tab-button"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            onclick="setAdminTab('report')">
+            Monthly Coach Report
+          </button>
+        </div>
+
+        <div id="attendanceAdminTab" class="admin-tab-pane">
         <div class="grid">
           <div class="card">
             <h3>Total Coaches</h3>
@@ -902,7 +991,10 @@
           <div id="correctionMessage" class="message"></div>
         </div>
 
-        <div id="payrollCard" class="card" style="margin-top:20px;">
+        </div>
+
+        <div id="payrollAdminTab" class="admin-tab-pane hidden">
+        <div id="payrollCard" class="card">
           <h3>Coach Payroll</h3>
           <p class="location-text">
             Monthly salary calculation based on scheduled hours, attendance,
@@ -1036,7 +1128,10 @@
           </div>
         </div>
 
-        <div id="monthlyReportCard" class="card" style="margin-top:20px;">
+        </div>
+
+        <div id="monthlyReportAdminTab" class="admin-tab-pane hidden">
+        <div id="monthlyReportCard" class="card">
           <div class="no-print">
             <h3>Monthly Coach Report</h3>
             <p class="location-text">
@@ -1162,6 +1257,7 @@
             <div class="signature-line">Authorized by</div>
           </div>
         </div>
+        </div>
       </div>
     </main>
   </section>
@@ -1191,6 +1287,52 @@
     const appScreen = document.getElementById("appScreen");
     const coachDashboard = document.getElementById("coachDashboard");
     const adminDashboard = document.getElementById("adminDashboard");
+
+    window.setAdminTab = function(tabName) {
+      const tabs = {
+        attendance: {
+          pane: document.getElementById("attendanceAdminTab"),
+          button: document.getElementById("attendanceTabButton")
+        },
+        payroll: {
+          pane: document.getElementById("payrollAdminTab"),
+          button: document.getElementById("payrollTabButton")
+        },
+        report: {
+          pane: document.getElementById("monthlyReportAdminTab"),
+          button: document.getElementById("reportTabButton")
+        }
+      };
+
+      if (!tabs[tabName]) return;
+
+      Object.entries(tabs).forEach(([name, tab]) => {
+        const active = name === tabName;
+        tab.pane?.classList.toggle("hidden", !active);
+        tab.button?.classList.toggle("active", active);
+        tab.button?.setAttribute("aria-selected", active ? "true" : "false");
+      });
+
+      try {
+        sessionStorage.setItem("jungleGymAdminTab", tabName);
+      } catch (error) {
+        // Tab switching still works if browser storage is unavailable.
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    function restoreAdminTab() {
+      let selected = "attendance";
+
+      try {
+        selected = sessionStorage.getItem("jungleGymAdminTab") || "attendance";
+      } catch (error) {
+        selected = "attendance";
+      }
+
+      setAdminTab(selected);
+    }
 
     function showMessage(element, text, type) {
       element.textContent = text;
@@ -1360,6 +1502,7 @@
       if (profile.role === "admin") {
         adminDashboard.classList.remove("hidden");
         coachDashboard.classList.add("hidden");
+        restoreAdminTab();
         await loadAdminDashboard();
       } else {
         coachDashboard.classList.remove("hidden");
