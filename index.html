@@ -1008,7 +1008,7 @@
             Minimum attendance is 70%. If attendance falls below the minimum,
             the system recommends an attendance adjustment equal to the
             percentage-point shortfall, capped at 30% of basic salary.
-            Attendance of 90%–94.99% earns a 2.5% bonus and 95%+ earns a 5%
+            Attendance of 90%–94.99% earns a 5% bonus and 95%+ earns a 10%
             bonus. Approved overtime and shift-cover hours are paid at 1.5×
             the calculated hourly rate. Short-notice covers add Rs. 500 each,
             and 3 or more approved covers in the month add a Rs. 1,000 team
@@ -2229,8 +2229,8 @@
           scheduled_hours_month: defaults.scheduled_hours_month,
           minimum_attendance_pct: 70,
           overtime_multiplier: 1.5,
-          attendance_bonus_95_pct: 5,
-          attendance_bonus_90_pct: 2.5,
+          attendance_bonus_95_pct: 10,
+          attendance_bonus_90_pct: 5,
           short_notice_allowance: 500,
           team_support_threshold: 3,
           team_support_bonus: 1000,
@@ -2301,7 +2301,27 @@
 
       try {
         await ensurePayrollSettings();
+
+        const coachIds = adminCoaches.map(coach => coach.id);
+        if (coachIds.length) {
+          const { error: policyUpdateError } = await db
+            .from("coach_payroll_settings")
+            .update({
+              attendance_bonus_95_pct: 10,
+              attendance_bonus_90_pct: 5,
+              updated_at: new Date().toISOString()
+            })
+            .in("coach_id", coachIds);
+
+          if (policyUpdateError) throw policyUpdateError;
+        }
+
         if (adminPayrollSettings.length < adminCoaches.length) {
+          const refreshed = await db.from("coach_payroll_settings").select("*");
+          if (!refreshed.error) {
+            adminPayrollSettings = refreshed.data || [];
+          }
+        } else {
           const refreshed = await db.from("coach_payroll_settings").select("*");
           if (!refreshed.error) {
             adminPayrollSettings = refreshed.data || [];
@@ -2365,8 +2385,8 @@
         scheduled_hours_month: Number(document.getElementById(`scheduled-${coachId}`).value || 0),
         minimum_attendance_pct: Number(document.getElementById(`minimum-${coachId}`).value || 70),
         overtime_multiplier: Number(document.getElementById(`multiplier-${coachId}`).value || 1.5),
-        attendance_bonus_95_pct: Number(existing.attendance_bonus_95_pct ?? 5),
-        attendance_bonus_90_pct: Number(existing.attendance_bonus_90_pct ?? 2.5),
+        attendance_bonus_95_pct: Number(existing.attendance_bonus_95_pct ?? 10),
+        attendance_bonus_90_pct: Number(existing.attendance_bonus_90_pct ?? 5),
         short_notice_allowance: Number(existing.short_notice_allowance ?? 500),
         team_support_threshold: Number(existing.team_support_threshold ?? 3),
         team_support_bonus: Number(existing.team_support_bonus ?? 1000),
@@ -2407,8 +2427,8 @@
         ...defaultPayrollForCoach(coach),
         minimum_attendance_pct: 70,
         overtime_multiplier: 1.5,
-        attendance_bonus_95_pct: 5,
-        attendance_bonus_90_pct: 2.5,
+        attendance_bonus_95_pct: 10,
+        attendance_bonus_90_pct: 5,
         short_notice_allowance: 500,
         team_support_threshold: 3,
         team_support_bonus: 1000
@@ -2445,10 +2465,10 @@
       let attendanceBonus = 0;
       if (attendancePct >= 95) {
         attendanceBonus = baseSalary *
-          Number(setting.attendance_bonus_95_pct ?? 5) / 100;
+          Number(setting.attendance_bonus_95_pct ?? 10) / 100;
       } else if (attendancePct >= 90) {
         attendanceBonus = baseSalary *
-          Number(setting.attendance_bonus_90_pct ?? 2.5) / 100;
+          Number(setting.attendance_bonus_90_pct ?? 5) / 100;
       }
 
       const overtimeHours = Math.max(0, regularWorkedHours - scheduledHours);
