@@ -6,6 +6,8 @@
   <title>Jungle Gym Coach Attendance</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 
   <style>
     :root {
@@ -393,6 +395,42 @@
       color: white;
       background: transparent;
       font-weight: bold;
+    }
+
+    .payroll-policy {
+      padding: 14px;
+      margin: 14px 0 18px;
+      border-left: 4px solid var(--green);
+      background: rgba(101, 211, 60, 0.08);
+      color: #dce5dc;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .payroll-table input {
+      min-width: 110px;
+      padding: 9px;
+    }
+
+    .payroll-positive {
+      color: #baff9f;
+      font-weight: bold;
+    }
+
+    .payroll-warning {
+      color: #ffb3b1;
+      font-weight: bold;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+    }
+
+    .checkbox-row input {
+      width: auto;
     }
 
     .report-document-header {
@@ -864,6 +902,140 @@
           <div id="correctionMessage" class="message"></div>
         </div>
 
+        <div id="payrollCard" class="card" style="margin-top:20px;">
+          <h3>Coach Payroll</h3>
+          <p class="location-text">
+            Monthly salary calculation based on scheduled hours, attendance,
+            approved extra hours and approved shift covers.
+          </p>
+
+          <div id="payrollMessage" class="message"></div>
+
+          <div class="payroll-policy">
+            <strong>Current payroll rules:</strong>
+            Minimum attendance is 70%. If attendance falls below the minimum,
+            the system recommends an attendance adjustment equal to the
+            percentage-point shortfall, capped at 30% of basic salary.
+            Attendance of 90%–94.99% earns a 2.5% bonus and 95%+ earns a 5%
+            bonus. Approved overtime and shift-cover hours are paid at 1.5×
+            the calculated hourly rate. Short-notice covers add Rs. 500 each,
+            and 3 or more approved covers in the month add a Rs. 1,000 team
+            support bonus. All rates remain editable in Supabase.
+          </div>
+
+          <div class="report-controls">
+            <div>
+              <label for="payrollMonth">Payroll Month</label>
+              <input id="payrollMonth" type="month">
+            </div>
+            <div class="report-actions">
+              <button id="refreshPayrollButton" class="refresh-button">
+                Recalculate Payroll
+              </button>
+              <button id="downloadPayrollCsvButton" class="logout-button">
+                Download Payroll CSV
+              </button>
+            </div>
+          </div>
+
+          <div class="table-card">
+            <h3>Salary & Scheduled Hours</h3>
+            <table class="payroll-table">
+              <thead>
+                <tr>
+                  <th>Coach</th>
+                  <th>Basic Salary</th>
+                  <th>Scheduled Hrs / Month</th>
+                  <th>Min Attendance %</th>
+                  <th>OT / Cover Rate</th>
+                  <th>Save</th>
+                </tr>
+              </thead>
+              <tbody id="payrollSettingsBody"></tbody>
+            </table>
+          </div>
+
+          <div style="margin-top:22px;">
+            <h3>Add Approved Shift Cover</h3>
+            <div class="correction-form">
+              <div>
+                <label for="coveringCoach">Covering Coach</label>
+                <select id="coveringCoach">
+                  <option value="">Select coach</option>
+                </select>
+              </div>
+              <div>
+                <label for="absentCoach">Coach Being Covered</label>
+                <select id="absentCoach">
+                  <option value="">Select coach</option>
+                </select>
+              </div>
+              <div>
+                <label for="coverDate">Cover Date</label>
+                <input id="coverDate" type="date">
+              </div>
+              <div>
+                <label for="coverHours">Hours Covered</label>
+                <input id="coverHours" type="number" min="0.5" step="0.5" value="5">
+              </div>
+              <div>
+                <label>Short Notice</label>
+                <div class="checkbox-row">
+                  <input id="shortNoticeCover" type="checkbox">
+                  <span>Requested within 24 hours</span>
+                </div>
+              </div>
+              <div>
+                <label for="coverNotes">Notes</label>
+                <input id="coverNotes" type="text" placeholder="Optional">
+              </div>
+              <div>
+                <button id="saveShiftCoverButton" class="refresh-button">
+                  Add Shift Cover
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-card" style="margin-top:22px;">
+            <h3>Monthly Payroll Summary</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Coach</th>
+                  <th>Attendance</th>
+                  <th>Worked Hrs</th>
+                  <th>Cover Hrs</th>
+                  <th>Adjustment</th>
+                  <th>Bonus</th>
+                  <th>OT / Cover Pay</th>
+                  <th>Other Cover Benefits</th>
+                  <th>Estimated Salary</th>
+                  <th>Salary PDF</th>
+                </tr>
+              </thead>
+              <tbody id="payrollSummaryBody"></tbody>
+            </table>
+          </div>
+
+          <div class="table-card" style="margin-top:22px;">
+            <h3>Approved Shift Covers</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Covering Coach</th>
+                  <th>Covered Coach</th>
+                  <th>Hours</th>
+                  <th>Short Notice</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="shiftCoverBody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div id="monthlyReportCard" class="card" style="margin-top:20px;">
           <div class="no-print">
             <h3>Monthly Coach Report</h3>
@@ -1012,6 +1184,8 @@
     let locationWatcher = null;
     let adminCoaches = [];
     let adminAttendance = [];
+    let adminPayrollSettings = [];
+    let adminShiftCovers = [];
 
     const loginScreen = document.getElementById("loginScreen");
     const appScreen = document.getElementById("appScreen");
@@ -1621,6 +1795,7 @@
 
       initializeManualCheckIn();
       initializeMonthlyReport();
+      await initializePayrollModule();
     }
 
 
@@ -1862,6 +2037,795 @@
           document.getElementById("correctionCard").classList.add("hidden");
         }, 1800);
       }
+    );
+
+    function defaultPayrollForCoach(coach) {
+      const name = String(coach?.full_name || "").toLowerCase();
+      if (name.includes("chaminda")) {
+        return { base_salary: 40000, scheduled_hours_month: 224 };
+      }
+      if (name.includes("devon")) {
+        return { base_salary: 20000, scheduled_hours_month: 64 };
+      }
+      if (name.includes("malika")) {
+        return { base_salary: 20000, scheduled_hours_month: 144 };
+      }
+      if (name.includes("harshana")) {
+        return { base_salary: 20000, scheduled_hours_month: 110 };
+      }
+      return { base_salary: 0, scheduled_hours_month: 0 };
+    }
+
+    function money(value) {
+      return "Rs. " + Number(value || 0).toLocaleString("en-LK", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function coachById(id) {
+      return adminCoaches.find(coach => coach.id === id);
+    }
+
+    function payrollSettingFor(coachId) {
+      return adminPayrollSettings.find(item => item.coach_id === coachId);
+    }
+
+    async function ensurePayrollSettings() {
+      const missing = adminCoaches.filter(
+        coach => !payrollSettingFor(coach.id)
+      );
+
+      if (!missing.length) return;
+
+      const rows = missing.map(coach => {
+        const defaults = defaultPayrollForCoach(coach);
+        return {
+          coach_id: coach.id,
+          base_salary: defaults.base_salary,
+          scheduled_hours_month: defaults.scheduled_hours_month,
+          minimum_attendance_pct: 70,
+          overtime_multiplier: 1.5,
+          attendance_bonus_95_pct: 5,
+          attendance_bonus_90_pct: 2.5,
+          short_notice_allowance: 500,
+          team_support_threshold: 3,
+          team_support_bonus: 1000,
+          active: true,
+          updated_at: new Date().toISOString()
+        };
+      });
+
+      const { error } = await db
+        .from("coach_payroll_settings")
+        .upsert(rows, { onConflict: "coach_id" });
+
+      if (error) throw error;
+    }
+
+    function populatePayrollCoachLists() {
+      const options = adminCoaches
+        .filter(coach => coach.active !== false)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+        .map(coach => `<option value="${coach.id}">${coach.full_name}</option>`)
+        .join("");
+
+      document.getElementById("coveringCoach").innerHTML =
+        '<option value="">Select coach</option>' + options;
+      document.getElementById("absentCoach").innerHTML =
+        '<option value="">Select coach</option>' + options;
+    }
+
+    async function initializePayrollModule() {
+      const message = document.getElementById("payrollMessage");
+      const monthInput = document.getElementById("payrollMonth");
+
+      if (!monthInput.value) {
+        monthInput.value = colomboDateKey(new Date()).slice(0, 7);
+      }
+
+      if (!document.getElementById("coverDate").value) {
+        document.getElementById("coverDate").value = colomboDateKey(new Date());
+      }
+
+      populatePayrollCoachLists();
+      clearMessage(message);
+
+      const [settingsResult, coversResult] = await Promise.all([
+        db.from("coach_payroll_settings").select("*"),
+        db.from("shift_covers")
+          .select("*")
+          .order("cover_date", { ascending: false })
+      ]);
+
+      if (settingsResult.error || coversResult.error) {
+        const reason = settingsResult.error?.message || coversResult.error?.message;
+        showMessage(
+          message,
+          "Payroll database tables are not ready. Run supabase-payroll-module.sql in Supabase SQL Editor first. " +
+          (reason ? "Database message: " + reason : ""),
+          "error"
+        );
+        document.getElementById("payrollSettingsBody").innerHTML =
+          '<tr><td colspan="6">Payroll setup required.</td></tr>';
+        document.getElementById("payrollSummaryBody").innerHTML =
+          '<tr><td colspan="9">Payroll setup required.</td></tr>';
+        return;
+      }
+
+      adminPayrollSettings = settingsResult.data || [];
+      adminShiftCovers = coversResult.data || [];
+
+      try {
+        await ensurePayrollSettings();
+        if (adminPayrollSettings.length < adminCoaches.length) {
+          const refreshed = await db.from("coach_payroll_settings").select("*");
+          if (!refreshed.error) {
+            adminPayrollSettings = refreshed.data || [];
+          }
+        }
+      } catch (error) {
+        showMessage(message, error.message || "Unable to initialize payroll settings.", "error");
+      }
+
+      renderPayrollSettings();
+      renderPayrollSummary();
+      renderShiftCovers();
+    }
+
+    function renderPayrollSettings() {
+      document.getElementById("payrollSettingsBody").innerHTML =
+        adminCoaches
+          .filter(coach => coach.active !== false)
+          .sort((a, b) => a.full_name.localeCompare(b.full_name))
+          .map(coach => {
+            const setting = payrollSettingFor(coach.id) || {
+              ...defaultPayrollForCoach(coach),
+              minimum_attendance_pct: 70,
+              overtime_multiplier: 1.5
+            };
+
+            return `
+              <tr>
+                <td>${coach.full_name}</td>
+                <td>
+                  <input id="salary-${coach.id}" type="number" min="0" step="100"
+                    value="${Number(setting.base_salary || 0)}">
+                </td>
+                <td>
+                  <input id="scheduled-${coach.id}" type="number" min="0" step="0.5"
+                    value="${Number(setting.scheduled_hours_month || 0)}">
+                </td>
+                <td>
+                  <input id="minimum-${coach.id}" type="number" min="0" max="100" step="1"
+                    value="${Number(setting.minimum_attendance_pct ?? 70)}">
+                </td>
+                <td>
+                  <input id="multiplier-${coach.id}" type="number" min="1" step="0.1"
+                    value="${Number(setting.overtime_multiplier ?? 1.5)}">
+                </td>
+                <td>
+                  <button class="edit-button"
+                    onclick="savePayrollSetting('${coach.id}')">Save</button>
+                </td>
+              </tr>
+            `;
+          }).join("") || '<tr><td colspan="6">No active coaches.</td></tr>';
+    }
+
+    window.savePayrollSetting = async function(coachId) {
+      const message = document.getElementById("payrollMessage");
+      const existing = payrollSettingFor(coachId) || {};
+      const payload = {
+        coach_id: coachId,
+        base_salary: Number(document.getElementById(`salary-${coachId}`).value || 0),
+        scheduled_hours_month: Number(document.getElementById(`scheduled-${coachId}`).value || 0),
+        minimum_attendance_pct: Number(document.getElementById(`minimum-${coachId}`).value || 70),
+        overtime_multiplier: Number(document.getElementById(`multiplier-${coachId}`).value || 1.5),
+        attendance_bonus_95_pct: Number(existing.attendance_bonus_95_pct ?? 5),
+        attendance_bonus_90_pct: Number(existing.attendance_bonus_90_pct ?? 2.5),
+        short_notice_allowance: Number(existing.short_notice_allowance ?? 500),
+        team_support_threshold: Number(existing.team_support_threshold ?? 3),
+        team_support_bonus: Number(existing.team_support_bonus ?? 1000),
+        active: true,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await db
+        .from("coach_payroll_settings")
+        .upsert(payload, { onConflict: "coach_id" });
+
+      if (error) {
+        showMessage(message, error.message || "Unable to save payroll setting.", "error");
+        return;
+      }
+
+      showMessage(message, "Payroll setting saved.", "success");
+      await initializePayrollModule();
+    };
+
+    function monthlyAttendanceForCoach(coachId, month) {
+      return adminAttendance.filter(record =>
+        record.coach_id === coachId &&
+        colomboDateKey(record.check_in_time).startsWith(month)
+      );
+    }
+
+    function monthlyCoversForCoach(coachId, month) {
+      return adminShiftCovers.filter(item =>
+        item.approved !== false &&
+        item.covering_coach_id === coachId &&
+        String(item.cover_date || "").startsWith(month)
+      );
+    }
+
+    function calculateCoachPayroll(coach, month) {
+      const setting = payrollSettingFor(coach.id) || {
+        ...defaultPayrollForCoach(coach),
+        minimum_attendance_pct: 70,
+        overtime_multiplier: 1.5,
+        attendance_bonus_95_pct: 5,
+        attendance_bonus_90_pct: 2.5,
+        short_notice_allowance: 500,
+        team_support_threshold: 3,
+        team_support_bonus: 1000
+      };
+
+      const records = monthlyAttendanceForCoach(coach.id, month);
+      const covers = monthlyCoversForCoach(coach.id, month);
+      const totalMinutes = records.reduce(
+        (sum, record) => sum + Number(workedMinutesFor(record) || 0),
+        0
+      );
+      const workedHours = totalMinutes / 60;
+      const coverHours = covers.reduce(
+        (sum, item) => sum + Number(item.cover_hours || 0),
+        0
+      );
+
+      const scheduledHours = Number(setting.scheduled_hours_month || 0);
+      const baseSalary = Number(setting.base_salary || 0);
+      const minimumAttendance = Number(setting.minimum_attendance_pct ?? 70);
+      const multiplier = Number(setting.overtime_multiplier ?? 1.5);
+      const hourlyRate = scheduledHours > 0 ? baseSalary / scheduledHours : 0;
+
+      // Cover shifts receive separate benefit and do not hide missed normal shifts.
+      const regularWorkedHours = Math.max(0, workedHours - coverHours);
+      const attendancePct = scheduledHours > 0
+        ? Math.min(100, (regularWorkedHours / scheduledHours) * 100)
+        : 0;
+
+      const attendanceShortfall = Math.max(0, minimumAttendance - attendancePct);
+      const adjustmentPct = Math.min(30, attendanceShortfall);
+      const attendanceAdjustment = baseSalary * adjustmentPct / 100;
+
+      let attendanceBonus = 0;
+      if (attendancePct >= 95) {
+        attendanceBonus = baseSalary *
+          Number(setting.attendance_bonus_95_pct ?? 5) / 100;
+      } else if (attendancePct >= 90) {
+        attendanceBonus = baseSalary *
+          Number(setting.attendance_bonus_90_pct ?? 2.5) / 100;
+      }
+
+      const overtimeHours = Math.max(0, regularWorkedHours - scheduledHours);
+      const overtimePay = overtimeHours * hourlyRate * multiplier;
+      const coverPay = coverHours * hourlyRate * multiplier;
+
+      const shortNoticeCount = covers.filter(item => item.short_notice).length;
+      const shortNoticePay =
+        shortNoticeCount * Number(setting.short_notice_allowance ?? 500);
+      const teamSupportPay = covers.length >= Number(setting.team_support_threshold ?? 3)
+        ? Number(setting.team_support_bonus ?? 1000)
+        : 0;
+
+      const estimatedSalary =
+        baseSalary -
+        attendanceAdjustment +
+        attendanceBonus +
+        overtimePay +
+        coverPay +
+        shortNoticePay +
+        teamSupportPay;
+
+      return {
+        coach,
+        setting,
+        attendancePct,
+        workedHours,
+        regularWorkedHours,
+        hourlyRate,
+        coverHours,
+        attendanceAdjustment,
+        attendanceBonus,
+        overtimeHours,
+        overtimePay,
+        coverPay,
+        shortNoticeCount,
+        shortNoticePay,
+        teamSupportPay,
+        estimatedSalary
+      };
+    }
+
+    function renderPayrollSummary() {
+      const month = document.getElementById("payrollMonth").value;
+      const rows = adminCoaches
+        .filter(coach => coach.active !== false)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+        .map(coach => calculateCoachPayroll(coach, month));
+
+      document.getElementById("payrollSummaryBody").innerHTML =
+        rows.map(item => {
+          const below = item.attendancePct <
+            Number(item.setting.minimum_attendance_pct ?? 70);
+          const benefitTotal =
+            item.shortNoticePay + item.teamSupportPay;
+          const overtimeCoverPay = item.overtimePay + item.coverPay;
+
+          return `
+            <tr>
+              <td>${item.coach.full_name}</td>
+              <td class="${below ? "payroll-warning" : "payroll-positive"}">
+                ${item.attendancePct.toFixed(1)}%
+              </td>
+              <td>${item.workedHours.toFixed(1)}</td>
+              <td>${item.coverHours.toFixed(1)}</td>
+              <td class="${item.attendanceAdjustment > 0 ? "payroll-warning" : ""}">
+                ${item.attendanceAdjustment > 0 ? "-" : ""}${money(item.attendanceAdjustment)}
+              </td>
+              <td class="${item.attendanceBonus > 0 ? "payroll-positive" : ""}">
+                ${money(item.attendanceBonus)}
+              </td>
+              <td class="${overtimeCoverPay > 0 ? "payroll-positive" : ""}">
+                ${money(overtimeCoverPay)}
+              </td>
+              <td class="${benefitTotal > 0 ? "payroll-positive" : ""}">
+                ${money(benefitTotal)}
+              </td>
+              <td><strong>${money(item.estimatedSalary)}</strong></td>
+              <td>
+                <button class="edit-button"
+                  onclick="downloadCoachSalaryPdf('${item.coach.id}')">
+                  Download PDF
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join("") || '<tr><td colspan="10">No coaches available.</td></tr>';
+    }
+
+    function renderShiftCovers() {
+      const month = document.getElementById("payrollMonth").value;
+      const covers = adminShiftCovers.filter(item =>
+        item.approved !== false &&
+        String(item.cover_date || "").startsWith(month)
+      );
+
+      document.getElementById("shiftCoverBody").innerHTML =
+        covers.map(item => `
+          <tr>
+            <td>${item.cover_date}</td>
+            <td>${coachById(item.covering_coach_id)?.full_name || "Unknown"}</td>
+            <td>${coachById(item.absent_coach_id)?.full_name || "Unknown"}</td>
+            <td>${Number(item.cover_hours || 0).toFixed(1)}</td>
+            <td>${item.short_notice ? "Yes" : "No"}</td>
+            <td>${item.notes || "—"}</td>
+          </tr>
+        `).join("") || '<tr><td colspan="6">No approved shift covers for this month.</td></tr>';
+    }
+
+    document.getElementById("saveShiftCoverButton").addEventListener(
+      "click",
+      async () => {
+        const message = document.getElementById("payrollMessage");
+        const coveringCoach = document.getElementById("coveringCoach").value;
+        const absentCoach = document.getElementById("absentCoach").value;
+        const coverDate = document.getElementById("coverDate").value;
+        const coverHours = Number(document.getElementById("coverHours").value || 0);
+        const shortNotice = document.getElementById("shortNoticeCover").checked;
+        const notes = document.getElementById("coverNotes").value.trim();
+
+        if (!coveringCoach || !absentCoach || !coverDate || coverHours <= 0) {
+          showMessage(message, "Complete all required shift-cover fields.", "error");
+          return;
+        }
+
+        if (coveringCoach === absentCoach) {
+          showMessage(message, "Covering coach and absent coach must be different.", "error");
+          return;
+        }
+
+        const { error } = await db.from("shift_covers").insert({
+          covering_coach_id: coveringCoach,
+          absent_coach_id: absentCoach,
+          cover_date: coverDate,
+          cover_hours: coverHours,
+          short_notice: shortNotice,
+          approved: true,
+          notes: notes || null
+        });
+
+        if (error) {
+          showMessage(message, error.message || "Unable to save shift cover.", "error");
+          return;
+        }
+
+        document.getElementById("coverNotes").value = "";
+        document.getElementById("shortNoticeCover").checked = false;
+        showMessage(message, "Shift cover added and payroll recalculated.", "success");
+        await initializePayrollModule();
+      }
+    );
+
+    async function salaryPdfLogoDataUrl() {
+      const response = await fetch("jungle-gym-logo.png");
+      if (!response.ok) throw new Error("Unable to load Jungle Gym logo.");
+      const blob = await response.blob();
+
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Unable to read Jungle Gym logo."));
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function payrollMonthLabel(month) {
+      if (!month) return "Selected Month";
+      return new Date(`${month}-01T00:00:00`).toLocaleDateString(
+        "en-LK",
+        { month: "long", year: "numeric" }
+      );
+    }
+
+    function salaryPdfFilePart(value) {
+      return String(value || "coach")
+        .trim()
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+
+    window.downloadCoachSalaryPdf = async function(coachId) {
+      const message = document.getElementById("payrollMessage");
+      clearMessage(message);
+
+      const coach = coachById(coachId);
+      const month = document.getElementById("payrollMonth").value;
+
+      if (!coach || !month) {
+        showMessage(message, "Select a payroll month and coach first.", "error");
+        return;
+      }
+
+      if (!window.jspdf?.jsPDF) {
+        showMessage(message, "PDF library has not loaded. Refresh the page and try again.", "error");
+        return;
+      }
+
+      const item = calculateCoachPayroll(coach, month);
+      const covers = monthlyCoversForCoach(coach.id, month);
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const left = 15;
+      const right = 15;
+      const usableWidth = pageWidth - left - right;
+      const green = [47, 125, 35];
+      const dark = [30, 38, 30];
+      const muted = [95, 105, 95];
+      const monthLabel = payrollMonthLabel(month);
+
+      try {
+        const logo = await salaryPdfLogoDataUrl();
+        doc.addImage(logo, "PNG", left, 10, 28, 28);
+      } catch (error) {
+        // The statement is still generated if the logo cannot be loaded.
+      }
+
+      doc.setTextColor(...green);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("JUNGLE GYM", left + 35, 18);
+
+      doc.setTextColor(...dark);
+      doc.setFontSize(15);
+      doc.text("COACH SALARY STATEMENT", left + 35, 26);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...muted);
+      doc.text(`Payroll Period: ${monthLabel}`, left + 35, 32);
+      doc.text(
+        `Generated: ${new Date().toLocaleString("en-LK", {
+          timeZone: "Asia/Colombo",
+          dateStyle: "medium",
+          timeStyle: "short"
+        })}`,
+        left + 35,
+        36
+      );
+
+      doc.setDrawColor(...green);
+      doc.setLineWidth(0.6);
+      doc.line(left, 42, pageWidth - right, 42);
+
+      doc.autoTable({
+        startY: 47,
+        margin: { left, right },
+        theme: "grid",
+        head: [["Coach Details", "Value"]],
+        body: [
+          ["Coach Name", coach.full_name],
+          ["Payroll Period", monthLabel],
+          ["Basic Salary", money(item.setting.base_salary)],
+          ["Scheduled Hours / Month", Number(item.setting.scheduled_hours_month || 0).toFixed(1)],
+          ["Calculated Hourly Rate", money(item.hourlyRate)],
+          ["Minimum Attendance Requirement", `${Number(item.setting.minimum_attendance_pct ?? 70).toFixed(0)}%`]
+        ],
+        headStyles: {
+          fillColor: green,
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 2.5
+        },
+        columnStyles: {
+          0: { cellWidth: usableWidth * 0.52, fontStyle: "bold" },
+          1: { cellWidth: usableWidth * 0.48 }
+        }
+      });
+
+      let y = doc.lastAutoTable.finalY + 7;
+
+      doc.autoTable({
+        startY: y,
+        margin: { left, right },
+        theme: "grid",
+        head: [["Attendance & Work Summary", "Result"]],
+        body: [
+          ["Attendance %", `${item.attendancePct.toFixed(2)}%`],
+          ["Regular Hours Counted", `${item.regularWorkedHours.toFixed(2)} hrs`],
+          ["Total Recorded Hours", `${item.workedHours.toFixed(2)} hrs`],
+          ["Overtime Hours", `${item.overtimeHours.toFixed(2)} hrs`],
+          ["Approved Shift Cover Hours", `${item.coverHours.toFixed(2)} hrs`],
+          ["Approved Shift Covers", String(covers.length)],
+          ["Short-Notice Covers", String(item.shortNoticeCount)],
+          ["OT / Shift-Cover Multiplier", `${Number(item.setting.overtime_multiplier ?? 1.5).toFixed(2)}x`]
+        ],
+        headStyles: {
+          fillColor: green,
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 2.3
+        },
+        columnStyles: {
+          0: { cellWidth: usableWidth * 0.62, fontStyle: "bold" },
+          1: { cellWidth: usableWidth * 0.38 }
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + 7;
+
+      const salaryRows = [
+        ["Basic Salary", money(item.setting.base_salary)],
+        ["Attendance Adjustment", item.attendanceAdjustment > 0
+          ? `- ${money(item.attendanceAdjustment)}`
+          : money(0)],
+        ["Attendance Bonus", item.attendanceBonus > 0
+          ? `+ ${money(item.attendanceBonus)}`
+          : money(0)],
+        ["Overtime Payment", item.overtimePay > 0
+          ? `+ ${money(item.overtimePay)}`
+          : money(0)],
+        ["Shift Cover Payment", item.coverPay > 0
+          ? `+ ${money(item.coverPay)}`
+          : money(0)],
+        ["Short-Notice Cover Benefit", item.shortNoticePay > 0
+          ? `+ ${money(item.shortNoticePay)}`
+          : money(0)],
+        ["Team Support Bonus", item.teamSupportPay > 0
+          ? `+ ${money(item.teamSupportPay)}`
+          : money(0)],
+        ["CALCULATED SALARY", money(item.estimatedSalary)]
+      ];
+
+      doc.autoTable({
+        startY: y,
+        margin: { left, right },
+        theme: "grid",
+        head: [["Salary Calculation", "Amount"]],
+        body: salaryRows,
+        headStyles: {
+          fillColor: green,
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 9.5,
+          cellPadding: 2.6
+        },
+        columnStyles: {
+          0: { cellWidth: usableWidth * 0.62 },
+          1: { cellWidth: usableWidth * 0.38, halign: "right" }
+        },
+        didParseCell(data) {
+          if (data.section === "body" && data.row.index === salaryRows.length - 1) {
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = [237, 244, 234];
+            data.cell.styles.textColor = green;
+          }
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + 7;
+
+      if (covers.length) {
+        const coverRows = covers.map(cover => [
+          cover.cover_date,
+          coachById(cover.absent_coach_id)?.full_name || "Unknown",
+          Number(cover.cover_hours || 0).toFixed(1),
+          cover.short_notice ? "Yes" : "No",
+          cover.notes || "—"
+        ]);
+
+        doc.autoTable({
+          startY: y,
+          margin: { left, right },
+          theme: "grid",
+          head: [["Date", "Coach Covered", "Hours", "Short Notice", "Notes"]],
+          body: coverRows,
+          headStyles: {
+            fillColor: green,
+            textColor: [255, 255, 255],
+            fontStyle: "bold"
+          },
+          styles: {
+            fontSize: 8,
+            cellPadding: 2
+          },
+          columnStyles: {
+            0: { cellWidth: 25 },
+            1: { cellWidth: 38 },
+            2: { cellWidth: 18, halign: "right" },
+            3: { cellWidth: 24 },
+            4: { cellWidth: usableWidth - 105 }
+          }
+        });
+        y = doc.lastAutoTable.finalY + 7;
+      }
+
+      if (y > 245) {
+        doc.addPage();
+        y = 20;
+      }
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...muted);
+      const note =
+        "Attendance percentage excludes approved shift-cover hours. " +
+        "This statement is generated from Jungle Gym attendance and payroll records " +
+        "and should be reviewed and authorized before payment.";
+      doc.text(doc.splitTextToSize(note, usableWidth), left, y);
+
+      y += 18;
+      doc.setDrawColor(120);
+      doc.line(left, y, left + 48, y);
+      doc.line(pageWidth / 2 - 24, y, pageWidth / 2 + 24, y);
+      doc.line(pageWidth - right - 48, y, pageWidth - right, y);
+      doc.setTextColor(...dark);
+      doc.setFontSize(8);
+      doc.text("Prepared By", left + 13, y + 5);
+      doc.text("Coach Signature", pageWidth / 2 - 13, y + 5);
+      doc.text("Authorized By", pageWidth - right - 36, y + 5);
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page++) {
+        doc.setPage(page);
+        doc.setFontSize(7.5);
+        doc.setTextColor(...muted);
+        doc.text(
+          `Jungle Gym Coach Salary Statement  |  Page ${page} of ${pageCount}`,
+          pageWidth / 2,
+          291,
+          { align: "center" }
+        );
+      }
+
+      const fileName =
+        `Jungle-Gym-Salary-${salaryPdfFilePart(coach.full_name)}-${month}.pdf`;
+      doc.save(fileName);
+
+      showMessage(
+        message,
+        `${coach.full_name}'s salary PDF was generated successfully.`,
+        "success"
+      );
+    };
+
+    function downloadPayrollCsv() {
+      const month = document.getElementById("payrollMonth").value;
+      const rows = adminCoaches
+        .filter(coach => coach.active !== false)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+        .map(coach => calculateCoachPayroll(coach, month));
+
+      const csvRows = [
+        ["Jungle Gym Coach Payroll", month],
+        [],
+        [
+          "Coach",
+          "Basic Salary",
+          "Attendance %",
+          "Worked Hours",
+          "Shift Cover Hours",
+          "Attendance Adjustment",
+          "Attendance Bonus",
+          "Overtime Pay",
+          "Shift Cover Pay",
+          "Short Notice Benefit",
+          "Team Support Bonus",
+          "Estimated Salary"
+        ],
+        ...rows.map(item => [
+          item.coach.full_name,
+          Number(item.setting.base_salary || 0).toFixed(2),
+          item.attendancePct.toFixed(2),
+          item.workedHours.toFixed(2),
+          item.coverHours.toFixed(2),
+          item.attendanceAdjustment.toFixed(2),
+          item.attendanceBonus.toFixed(2),
+          item.overtimePay.toFixed(2),
+          item.coverPay.toFixed(2),
+          item.shortNoticePay.toFixed(2),
+          item.teamSupportPay.toFixed(2),
+          item.estimatedSalary.toFixed(2)
+        ])
+      ];
+
+      const csv = csvRows
+        .map(row => row.map(csvCell).join(","))
+        .join("\r\n");
+      const blob = new Blob(["\uFEFF" + csv], {
+        type: "text/csv;charset=utf-8"
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `jungle-gym-payroll-${month || "month"}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById("payrollMonth").addEventListener(
+      "change",
+      () => {
+        renderPayrollSummary();
+        renderShiftCovers();
+      }
+    );
+
+    document.getElementById("refreshPayrollButton").addEventListener(
+      "click",
+      initializePayrollModule
+    );
+
+    document.getElementById("downloadPayrollCsvButton").addEventListener(
+      "click",
+      downloadPayrollCsv
     );
 
     function colomboDateKey(value) {
