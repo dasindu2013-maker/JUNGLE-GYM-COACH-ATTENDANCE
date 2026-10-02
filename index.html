@@ -6,6 +6,8 @@
   <title>Jungle Gym Coach Attendance</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 
   <style>
     :root {
@@ -1009,6 +1011,7 @@
                   <th>OT / Cover Pay</th>
                   <th>Other Cover Benefits</th>
                   <th>Estimated Salary</th>
+                  <th>Salary PDF</th>
                 </tr>
               </thead>
               <tbody id="payrollSummaryBody"></tbody>
@@ -2330,6 +2333,8 @@
         setting,
         attendancePct,
         workedHours,
+        regularWorkedHours,
+        hourlyRate,
         coverHours,
         attendanceAdjustment,
         attendanceBonus,
@@ -2379,9 +2384,15 @@
                 ${money(benefitTotal)}
               </td>
               <td><strong>${money(item.estimatedSalary)}</strong></td>
+              <td>
+                <button class="edit-button"
+                  onclick="downloadCoachSalaryPdf('${item.coach.id}')">
+                  Download PDF
+                </button>
+              </td>
             </tr>
           `;
-        }).join("") || '<tr><td colspan="9">No coaches available.</td></tr>';
+        }).join("") || '<tr><td colspan="10">No coaches available.</td></tr>';
     }
 
     function renderShiftCovers() {
@@ -2446,6 +2457,302 @@
         await initializePayrollModule();
       }
     );
+
+    async function salaryPdfLogoDataUrl() {
+      const response = await fetch("jungle-gym-logo.png");
+      if (!response.ok) throw new Error("Unable to load Jungle Gym logo.");
+      const blob = await response.blob();
+
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Unable to read Jungle Gym logo."));
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function payrollMonthLabel(month) {
+      if (!month) return "Selected Month";
+      return new Date(`${month}-01T00:00:00`).toLocaleDateString(
+        "en-LK",
+        { month: "long", year: "numeric" }
+      );
+    }
+
+    function salaryPdfFilePart(value) {
+      return String(value || "coach")
+        .trim()
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+
+    window.downloadCoachSalaryPdf = async function(coachId) {
+      const message = document.getElementById("payrollMessage");
+      clearMessage(message);
+
+      const coach = coachById(coachId);
+      const month = document.getElementById("payrollMonth").value;
+
+      if (!coach || !month) {
+        showMessage(message, "Select a payroll month and coach first.", "error");
+        return;
+      }
+
+      if (!window.jspdf?.jsPDF) {
+        showMessage(message, "PDF library has not loaded. Refresh the page and try again.", "error");
+        return;
+      }
+
+      const item = calculateCoachPayroll(coach, month);
+      const covers = monthlyCoversForCoach(coach.id, month);
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const left = 15;
+      const right = 15;
+      const usableWidth = pageWidth - left - right;
+      const green = [47, 125, 35];
+      const dark = [30, 38, 30];
+      const muted = [95, 105, 95];
+      const monthLabel = payrollMonthLabel(month);
+
+      try {
+        const logo = await salaryPdfLogoDataUrl();
+        doc.addImage(logo, "PNG", left, 10, 28, 28);
+      } catch (error) {
+        // The statement is still generated if the logo cannot be loaded.
+      }
+
+      doc.setTextColor(...green);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("JUNGLE GYM", left + 35, 18);
+
+      doc.setTextColor(...dark);
+      doc.setFontSize(15);
+      doc.text("COACH SALARY STATEMENT", left + 35, 26);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...muted);
+      doc.text(`Payroll Period: ${monthLabel}`, left + 35, 32);
+      doc.text(
+        `Generated: ${new Date().toLocaleString("en-LK", {
+          timeZone: "Asia/Colombo",
+          dateStyle: "medium",
+          timeStyle: "short"
+        })}`,
+        left + 35,
+        36
+      );
+
+      doc.setDrawColor(...green);
+      doc.setLineWidth(0.6);
+      doc.line(left, 42, pageWidth - right, 42);
+
+      doc.autoTable({
+        startY: 47,
+        margin: { left, right },
+        theme: "grid",
+        head: [["Coach Details", "Value"]],
+        body: [
+          ["Coach Name", coach.full_name],
+          ["Payroll Period", monthLabel],
+          ["Basic Salary", money(item.setting.base_salary)],
+          ["Scheduled Hours / Month", Number(item.setting.scheduled_hours_month || 0).toFixed(1)],
+          ["Calculated Hourly Rate", money(item.hourlyRate)],
+          ["Minimum Attendance Requirement", `${Number(item.setting.minimum_attendance_pct ?? 70).toFixed(0)}%`]
+        ],
+        headStyles: {
+          fillColor: green,
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 2.5
+        },
+        columnStyles: {
+          0: { cellWidth: usableWidth * 0.52, fontStyle: "bold" },
+          1: { cellWidth: usableWidth * 0.48 }
+        }
+      });
+
+      let y = doc.lastAutoTable.finalY + 7;
+
+      doc.autoTable({
+        startY: y,
+        margin: { left, right },
+        theme: "grid",
+        head: [["Attendance & Work Summary", "Result"]],
+        body: [
+          ["Attendance %", `${item.attendancePct.toFixed(2)}%`],
+          ["Regular Hours Counted", `${item.regularWorkedHours.toFixed(2)} hrs`],
+          ["Total Recorded Hours", `${item.workedHours.toFixed(2)} hrs`],
+          ["Overtime Hours", `${item.overtimeHours.toFixed(2)} hrs`],
+          ["Approved Shift Cover Hours", `${item.coverHours.toFixed(2)} hrs`],
+          ["Approved Shift Covers", String(covers.length)],
+          ["Short-Notice Covers", String(item.shortNoticeCount)],
+          ["OT / Shift-Cover Multiplier", `${Number(item.setting.overtime_multiplier ?? 1.5).toFixed(2)}x`]
+        ],
+        headStyles: {
+          fillColor: green,
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 2.3
+        },
+        columnStyles: {
+          0: { cellWidth: usableWidth * 0.62, fontStyle: "bold" },
+          1: { cellWidth: usableWidth * 0.38 }
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + 7;
+
+      const salaryRows = [
+        ["Basic Salary", money(item.setting.base_salary)],
+        ["Attendance Adjustment", item.attendanceAdjustment > 0
+          ? `- ${money(item.attendanceAdjustment)}`
+          : money(0)],
+        ["Attendance Bonus", item.attendanceBonus > 0
+          ? `+ ${money(item.attendanceBonus)}`
+          : money(0)],
+        ["Overtime Payment", item.overtimePay > 0
+          ? `+ ${money(item.overtimePay)}`
+          : money(0)],
+        ["Shift Cover Payment", item.coverPay > 0
+          ? `+ ${money(item.coverPay)}`
+          : money(0)],
+        ["Short-Notice Cover Benefit", item.shortNoticePay > 0
+          ? `+ ${money(item.shortNoticePay)}`
+          : money(0)],
+        ["Team Support Bonus", item.teamSupportPay > 0
+          ? `+ ${money(item.teamSupportPay)}`
+          : money(0)],
+        ["CALCULATED SALARY", money(item.estimatedSalary)]
+      ];
+
+      doc.autoTable({
+        startY: y,
+        margin: { left, right },
+        theme: "grid",
+        head: [["Salary Calculation", "Amount"]],
+        body: salaryRows,
+        headStyles: {
+          fillColor: green,
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 9.5,
+          cellPadding: 2.6
+        },
+        columnStyles: {
+          0: { cellWidth: usableWidth * 0.62 },
+          1: { cellWidth: usableWidth * 0.38, halign: "right" }
+        },
+        didParseCell(data) {
+          if (data.section === "body" && data.row.index === salaryRows.length - 1) {
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = [237, 244, 234];
+            data.cell.styles.textColor = green;
+          }
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + 7;
+
+      if (covers.length) {
+        const coverRows = covers.map(cover => [
+          cover.cover_date,
+          coachById(cover.absent_coach_id)?.full_name || "Unknown",
+          Number(cover.cover_hours || 0).toFixed(1),
+          cover.short_notice ? "Yes" : "No",
+          cover.notes || "—"
+        ]);
+
+        doc.autoTable({
+          startY: y,
+          margin: { left, right },
+          theme: "grid",
+          head: [["Date", "Coach Covered", "Hours", "Short Notice", "Notes"]],
+          body: coverRows,
+          headStyles: {
+            fillColor: green,
+            textColor: [255, 255, 255],
+            fontStyle: "bold"
+          },
+          styles: {
+            fontSize: 8,
+            cellPadding: 2
+          },
+          columnStyles: {
+            0: { cellWidth: 25 },
+            1: { cellWidth: 38 },
+            2: { cellWidth: 18, halign: "right" },
+            3: { cellWidth: 24 },
+            4: { cellWidth: usableWidth - 105 }
+          }
+        });
+        y = doc.lastAutoTable.finalY + 7;
+      }
+
+      if (y > 245) {
+        doc.addPage();
+        y = 20;
+      }
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...muted);
+      const note =
+        "Attendance percentage excludes approved shift-cover hours. " +
+        "This statement is generated from Jungle Gym attendance and payroll records " +
+        "and should be reviewed and authorized before payment.";
+      doc.text(doc.splitTextToSize(note, usableWidth), left, y);
+
+      y += 18;
+      doc.setDrawColor(120);
+      doc.line(left, y, left + 48, y);
+      doc.line(pageWidth / 2 - 24, y, pageWidth / 2 + 24, y);
+      doc.line(pageWidth - right - 48, y, pageWidth - right, y);
+      doc.setTextColor(...dark);
+      doc.setFontSize(8);
+      doc.text("Prepared By", left + 13, y + 5);
+      doc.text("Coach Signature", pageWidth / 2 - 13, y + 5);
+      doc.text("Authorized By", pageWidth - right - 36, y + 5);
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page++) {
+        doc.setPage(page);
+        doc.setFontSize(7.5);
+        doc.setTextColor(...muted);
+        doc.text(
+          `Jungle Gym Coach Salary Statement  |  Page ${page} of ${pageCount}`,
+          pageWidth / 2,
+          291,
+          { align: "center" }
+        );
+      }
+
+      const fileName =
+        `Jungle-Gym-Salary-${salaryPdfFilePart(coach.full_name)}-${month}.pdf`;
+      doc.save(fileName);
+
+      showMessage(
+        message,
+        `${coach.full_name}'s salary PDF was generated successfully.`,
+        "success"
+      );
+    };
 
     function downloadPayrollCsv() {
       const month = document.getElementById("payrollMonth").value;
