@@ -2193,11 +2193,7 @@
       }
 
       const { data: coaches, error: coachError } = await db
-        .from("profiles")
-        .select("id, full_name, active")
-        .eq("role", "coach")
-        .eq("active", true)
-        .order("full_name");
+        .rpc("get_leave_cover_coaches");
 
       if (!coachError) {
         const selected = coverSelect.value || "other";
