@@ -1013,7 +1013,10 @@
             approved shift covering another coach is paid using the configured
             shift-cover multiplier. Short-notice covers add Rs. 500 each, and
             3 or more approved covers in the month add a Rs. 1,000 team support
-            bonus. All rates remain editable in Supabase.
+            bonus. Membership registrations and renewals add a 10% commission
+            for the selected staff member. A receipt entered as "free" earns no
+            commission, and registrations credited to Alpha are paid to Harshana.
+            All rates remain editable in Supabase.
           </div>
 
           <div class="report-controls">
@@ -1103,6 +1106,7 @@
                   <th>Bonus</th>
                   <th>Shift Cover Pay</th>
                   <th>Other Cover Benefits</th>
+                  <th>Membership Commission</th>
                   <th>Estimated Salary</th>
                   <th>Salary PDF</th>
                 </tr>
@@ -1283,6 +1287,7 @@
     let adminAttendance = [];
     let adminPayrollSettings = [];
     let adminShiftCovers = [];
+    let adminMembershipCommissions = [];
 
     const loginScreen = document.getElementById("loginScreen");
     const appScreen = document.getElementById("appScreen");
@@ -2275,15 +2280,20 @@
       populatePayrollCoachLists();
       clearMessage(message);
 
-      const [settingsResult, coversResult] = await Promise.all([
+      const [settingsResult, coversResult, commissionsResult] = await Promise.all([
         db.from("coach_payroll_settings").select("*"),
         db.from("shift_covers")
           .select("*")
-          .order("cover_date", { ascending: false })
+          .order("cover_date", { ascending: false }),
+        db.from("membership_commissions")
+          .select("*")
+          .order("payment_date", { ascending: false })
       ]);
 
-      if (settingsResult.error || coversResult.error) {
-        const reason = settingsResult.error?.message || coversResult.error?.message;
+      if (settingsResult.error || coversResult.error || commissionsResult.error) {
+        const reason = settingsResult.error?.message ||
+          coversResult.error?.message ||
+          commissionsResult.error?.message;
         showMessage(
           message,
           "Payroll database tables are not ready. Run supabase-payroll-module.sql in Supabase SQL Editor first. " +
@@ -2293,12 +2303,13 @@
         document.getElementById("payrollSettingsBody").innerHTML =
           '<tr><td colspan="6">Payroll setup required.</td></tr>';
         document.getElementById("payrollSummaryBody").innerHTML =
-          '<tr><td colspan="9">Payroll setup required.</td></tr>';
+          '<tr><td colspan="11">Payroll setup required.</td></tr>';
         return;
       }
 
       adminPayrollSettings = settingsResult.data || [];
       adminShiftCovers = coversResult.data || [];
+      adminMembershipCommissions = commissionsResult.data || [];
 
       try {
         await ensurePayrollSettings();
@@ -2423,6 +2434,33 @@
       );
     }
 
+    function payrollCommissionName(value) {
+      const firstName = String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z]/g, " ")
+        .trim()
+        .split(/\s+/)[0] || "";
+
+      return firstName === "alpha" ? "harshana" : firstName;
+    }
+
+    function monthlyCommissionRecordsForCoach(coach, month) {
+      const coachName = payrollCommissionName(coach.full_name);
+
+      return adminMembershipCommissions.filter(item =>
+        String(item.payment_date || "").startsWith(month) &&
+        payrollCommissionName(item.staff_name) === coachName
+      );
+    }
+
+    function monthlyCommissionForCoach(coach, month) {
+      return monthlyCommissionRecordsForCoach(coach, month).reduce(
+        (sum, item) => sum + Number(item.commission_amount || 0),
+        0
+      );
+    }
+
     function calculateCoachPayroll(coach, month) {
       const setting = payrollSettingFor(coach.id) || {
         ...defaultPayrollForCoach(coach),
@@ -2482,6 +2520,7 @@
       const teamSupportPay = covers.length >= Number(setting.team_support_threshold ?? 3)
         ? Number(setting.team_support_bonus ?? 1000)
         : 0;
+      const membershipCommission = monthlyCommissionForCoach(coach, month);
 
       const estimatedSalary =
         baseSalary -
@@ -2489,7 +2528,8 @@
         attendanceBonus +
         coverPay +
         shortNoticePay +
-        teamSupportPay;
+        teamSupportPay +
+        membershipCommission;
 
       return {
         coach,
@@ -2505,6 +2545,7 @@
         shortNoticeCount,
         shortNoticePay,
         teamSupportPay,
+        membershipCommission,
         estimatedSalary
       };
     }
@@ -2544,6 +2585,9 @@
               <td class="${benefitTotal > 0 ? "payroll-positive" : ""}">
                 ${money(benefitTotal)}
               </td>
+              <td class="${item.membershipCommission > 0 ? "payroll-positive" : ""}">
+                ${money(item.membershipCommission)}
+              </td>
               <td><strong>${money(item.estimatedSalary)}</strong></td>
               <td>
                 <button class="edit-button"
@@ -2553,7 +2597,7 @@
               </td>
             </tr>
           `;
-        }).join("") || '<tr><td colspan="10">No coaches available.</td></tr>';
+        }).join("") || '<tr><td colspan="11">No coaches available.</td></tr>';
     }
 
     function renderShiftCovers() {
@@ -2666,6 +2710,7 @@
 
       const item = calculateCoachPayroll(coach, month);
       const covers = monthlyCoversForCoach(coach.id, month);
+      const commissionRecords = monthlyCommissionRecordsForCoach(coach, month);
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({
         orientation: "portrait",
@@ -2758,6 +2803,7 @@
           ["Approved Shift Cover Hours", `${item.coverHours.toFixed(2)} hrs`],
           ["Approved Shift Covers", String(covers.length)],
           ["Short-Notice Covers", String(item.shortNoticeCount)],
+          ["Membership Sales Credited", String(commissionRecords.filter(item => Number(item.commission_amount || 0) > 0).length)],
           ["Shift-Cover Multiplier", `${Number(item.setting.overtime_multiplier ?? 1.5).toFixed(2)}x`]
         ],
         headStyles: {
@@ -2793,6 +2839,9 @@
           : money(0)],
         ["Team Support Bonus", item.teamSupportPay > 0
           ? `+ ${money(item.teamSupportPay)}`
+          : money(0)],
+        ["Membership Commission (10%)", item.membershipCommission > 0
+          ? `+ ${money(item.membershipCommission)}`
           : money(0)],
         ["CALCULATED SALARY", money(item.estimatedSalary)]
       ];
@@ -2932,6 +2981,7 @@
           "Shift Cover Pay",
           "Short Notice Benefit",
           "Team Support Bonus",
+          "Membership Commission",
           "Estimated Salary"
         ],
         ...rows.map(item => [
@@ -2945,6 +2995,7 @@
           item.coverPay.toFixed(2),
           item.shortNoticePay.toFixed(2),
           item.teamSupportPay.toFixed(2),
+          item.membershipCommission.toFixed(2),
           item.estimatedSalary.toFixed(2)
         ])
       ];
