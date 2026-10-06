@@ -5,6 +5,14 @@ alter table public.membership_commissions
   add column if not exists member_name text,
   add column if not exists nic_number text;
 
+-- Correct any previously imported complimentary memberships immediately.
+update public.membership_commissions
+set
+  is_free = true,
+  commission_amount = 0,
+  updated_at = now()
+where lower(trim(receipt_number)) like 'free%';
+
 create or replace function public.sync_membership_commission(
   p_secret text,
   p_row jsonb
@@ -41,7 +49,7 @@ begin
   v_member_name := nullif(trim(p_row ->> 'member_name'), '');
   v_nic_number := nullif(trim(p_row ->> 'nic_number'), '');
   v_paid := greatest(coalesce((p_row ->> 'paid_amount')::numeric, 0), 0);
-  v_is_free := lower(coalesce(v_receipt, '')) = 'free';
+  v_is_free := lower(coalesce(v_receipt, '')) like 'free%';
   v_commission := case
     when v_is_free then 0
     else round(v_paid * 0.10, 2)
