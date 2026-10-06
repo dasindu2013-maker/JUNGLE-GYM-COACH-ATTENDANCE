@@ -74,7 +74,7 @@ language sql
 stable
 security definer
 set search_path = public
-as $
+as $leave_coaches$
   select p.id, p.full_name
   from public.profiles p
   where p.role = 'coach'
@@ -82,7 +82,7 @@ as $
     and p.id <> auth.uid()
     and lower(trim(p.full_name)) not like 'randy senevir%'
   order by p.full_name;
-$;
+$leave_coaches$;
 
 create or replace function public.submit_leave_request(
   p_leave_date date,
