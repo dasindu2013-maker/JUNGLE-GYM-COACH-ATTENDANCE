@@ -90,7 +90,7 @@ begin
   v_member_name := nullif(trim(p_row ->> 'member_name'), '');
   v_nic_number := nullif(trim(p_row ->> 'nic_number'), '');
   v_paid := greatest(coalesce((p_row ->> 'paid_amount')::numeric, 0), 0);
-  v_is_free := lower(coalesce(v_receipt, '')) = 'free';
+  v_is_free := lower(coalesce(v_receipt, '')) like 'free%';
   v_commission := case
     when v_is_free then 0
     else round(v_paid * 0.10, 2)
