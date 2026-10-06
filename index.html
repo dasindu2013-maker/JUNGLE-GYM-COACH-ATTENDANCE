@@ -464,6 +464,71 @@
       font-weight: bold;
     }
 
+    .commission-link {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #baff9f;
+      font-weight: bold;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+
+    .commission-link:hover,
+    .commission-link:focus {
+      color: white;
+    }
+
+    .commission-dialog {
+      width: min(460px, calc(100% - 32px));
+      padding: 0;
+      color: white;
+      background: #1a1f1a;
+      border: 1px solid rgba(101, 211, 60, 0.55);
+      border-radius: 16px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+    }
+
+    .commission-dialog::backdrop {
+      background: rgba(0, 0, 0, 0.72);
+    }
+
+    .commission-dialog-content {
+      padding: 22px;
+    }
+
+    .commission-dialog-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .commission-dialog-header h3 {
+      margin: 0 0 4px;
+    }
+
+    .commission-dialog-close {
+      padding: 6px 10px;
+      border: 1px solid #596359;
+      border-radius: 8px;
+      color: white;
+      background: transparent;
+      font-weight: bold;
+    }
+
+    .commission-receipt {
+      padding: 11px 13px;
+      margin-top: 8px;
+      color: #e9f4e5;
+      background: #101510;
+      border: 1px solid #344034;
+      border-radius: 9px;
+      font-weight: bold;
+    }
+
     .checkbox-row {
       display: flex;
       align-items: center;
@@ -1114,6 +1179,22 @@
               <tbody id="payrollSummaryBody"></tbody>
             </table>
           </div>
+
+          <dialog id="commissionDialog" class="commission-dialog">
+            <div class="commission-dialog-content">
+              <div class="commission-dialog-header">
+                <div>
+                  <h3>Membership Commission Receipts</h3>
+                  <p id="commissionDialogSubtitle" class="location-text"></p>
+                </div>
+                <button type="button" class="commission-dialog-close"
+                  onclick="closeCommissionReceipts()" aria-label="Close">
+                  Close
+                </button>
+              </div>
+              <div id="commissionReceiptList"></div>
+            </div>
+          </dialog>
 
           <div class="table-card" style="margin-top:22px;">
             <h3>Approved Shift Covers</h3>
@@ -2564,6 +2645,12 @@
           const benefitTotal =
             item.shortNoticePay + item.teamSupportPay;
           const shiftCoverPay = item.coverPay;
+          const commissionDisplay = item.membershipCommission > 0
+            ? `<button type="button" class="commission-link"
+                onclick="showCommissionReceipts('${item.coach.id}')">
+                ${money(item.membershipCommission)}
+              </button>`
+            : money(item.membershipCommission);
 
           return `
             <tr>
@@ -2586,7 +2673,7 @@
                 ${money(benefitTotal)}
               </td>
               <td class="${item.membershipCommission > 0 ? "payroll-positive" : ""}">
-                ${money(item.membershipCommission)}
+                ${commissionDisplay}
               </td>
               <td><strong>${money(item.estimatedSalary)}</strong></td>
               <td>
@@ -2599,6 +2686,45 @@
           `;
         }).join("") || '<tr><td colspan="11">No coaches available.</td></tr>';
     }
+
+    window.showCommissionReceipts = function(coachId) {
+      const month = document.getElementById("payrollMonth").value;
+      const coach = coachById(coachId);
+      const records = coach
+        ? monthlyCommissionRecordsForCoach(coach, month)
+            .filter(item => Number(item.commission_amount || 0) > 0)
+        : [];
+      const dialog = document.getElementById("commissionDialog");
+      const subtitle = document.getElementById("commissionDialogSubtitle");
+      const list = document.getElementById("commissionReceiptList");
+
+      subtitle.textContent =
+        (coach?.full_name || "Coach") + " — " +
+        payrollMonthLabel(month) + " — " +
+        records.length + (records.length === 1 ? " receipt" : " receipts");
+
+      list.replaceChildren();
+
+      if (!records.length) {
+        const empty = document.createElement("p");
+        empty.className = "location-text";
+        empty.textContent = "No commission-earning receipt numbers for this month.";
+        list.appendChild(empty);
+      } else {
+        records.forEach(item => {
+          const receipt = document.createElement("div");
+          receipt.className = "commission-receipt";
+          receipt.textContent = item.receipt_number || "Receipt number unavailable";
+          list.appendChild(receipt);
+        });
+      }
+
+      dialog.showModal();
+    };
+
+    window.closeCommissionReceipts = function() {
+      document.getElementById("commissionDialog").close();
+    };
 
     function renderShiftCovers() {
       const month = document.getElementById("payrollMonth").value;
@@ -2875,6 +3001,54 @@
       });
 
       y = doc.lastAutoTable.finalY + 7;
+
+      if (commissionRecords.length) {
+        const commissionRows = commissionRecords.map(record => [
+          record.payment_date || "—",
+          record.member_name || "Not available",
+          record.nic_number || "Not available",
+          record.receipt_number || "—",
+          record.registration_type || "—",
+          money(record.paid_amount),
+          money(record.commission_amount)
+        ]);
+
+        doc.autoTable({
+          startY: y,
+          margin: { left, right },
+          theme: "grid",
+          head: [[
+            "Date",
+            "Member Name",
+            "NIC / ID",
+            "Receipt",
+            "Type",
+            "Paid",
+            "Commission"
+          ]],
+          body: commissionRows,
+          headStyles: {
+            fillColor: green,
+            textColor: [255, 255, 255],
+            fontStyle: "bold"
+          },
+          styles: {
+            fontSize: 7,
+            cellPadding: 1.7,
+            overflow: "linebreak"
+          },
+          columnStyles: {
+            0: { cellWidth: 19 },
+            1: { cellWidth: 33 },
+            2: { cellWidth: 25 },
+            3: { cellWidth: 22 },
+            4: { cellWidth: 25 },
+            5: { cellWidth: 24, halign: "right" },
+            6: { cellWidth: 27, halign: "right" }
+          }
+        });
+        y = doc.lastAutoTable.finalY + 7;
+      }
 
       if (covers.length) {
         const coverRows = covers.map(cover => [
