@@ -47,6 +47,8 @@ try {
       type === 'renewal' ? 'Membership Renewal' : 'New Member',
     payment_date: paymentDate,
     staff_name: staffName,
+    member_name: members[0].fullName,
+    nic_number: members[0].identityNumber,
     paid_amount: paidAmount
   });
 } catch (error) {
