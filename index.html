@@ -622,6 +622,135 @@
       font-size: 13px;
     }
 
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mail-button {
+      position: relative;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border: 1px solid #596359;
+      border-radius: 10px;
+      color: white;
+      background: transparent;
+      font-size: 21px;
+    }
+
+    .mail-button:hover,
+    .mail-button:focus {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .mail-badge {
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      min-width: 21px;
+      height: 21px;
+      padding: 0 6px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      color: white;
+      background: var(--red);
+      border: 2px solid #090c09;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .leave-request-card {
+      padding: 15px;
+      margin-top: 12px;
+      background: #101510;
+      border: 1px solid #344034;
+      border-radius: 12px;
+    }
+
+    .leave-request-card.pending {
+      border-color: rgba(255, 192, 2, 0.65);
+    }
+
+    .leave-request-card.approved {
+      border-color: rgba(101, 211, 60, 0.55);
+    }
+
+    .leave-request-card.declined {
+      border-color: rgba(239, 83, 80, 0.55);
+    }
+
+    .leave-request-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 9px;
+    }
+
+    .leave-request-header strong {
+      font-size: 16px;
+    }
+
+    .leave-request-card p {
+      margin: 6px 0;
+      color: #dce5dc;
+      line-height: 1.45;
+    }
+
+    .leave-status {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: capitalize;
+    }
+
+    .leave-status.pending {
+      color: #ffe08a;
+      background: rgba(255, 192, 2, 0.14);
+    }
+
+    .leave-status.approved {
+      color: #baff9f;
+      background: rgba(101, 211, 60, 0.14);
+    }
+
+    .leave-status.declined {
+      color: #ffaaa8;
+      background: rgba(239, 83, 80, 0.14);
+    }
+
+    .leave-review-actions {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .decline-button {
+      padding: 10px 14px;
+      border: 1px solid var(--red);
+      border-radius: 8px;
+      color: #ffaaa8;
+      background: rgba(239, 83, 80, 0.1);
+      font-weight: bold;
+    }
+
+    .leave-inbox-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
     @page {
       size: A4 landscape;
       margin: 12mm;
@@ -843,7 +972,14 @@
     <small>Coach Attendance</small>
   </div>
 </div>
-        <button id="logoutButton" class="logout-button">Log Out</button>
+        <div class="header-actions">
+          <button id="leaveInboxButton" class="mail-button hidden"
+            type="button" aria-label="Leave request inbox" title="Leave requests">
+            &#9993;
+            <span id="leaveInboxBadge" class="mail-badge hidden">0</span>
+          </button>
+          <button id="logoutButton" class="logout-button">Log Out</button>
+        </div>
       </div>
     </header>
 
@@ -886,6 +1022,65 @@
           <div id="attendanceMessage" class="message"></div>
         </div>
 
+
+        <div class="card" style="margin-top:20px;">
+          <h3>Request Leave</h3>
+          <p class="location-text">
+            Select your leave date, shift hours, and the coach who will cover
+            the shift. Select Other if no coach is confirmed.
+          </p>
+
+          <div class="correction-form">
+            <div>
+              <label for="leaveDate">Leave date</label>
+              <input id="leaveDate" type="date">
+            </div>
+            <div>
+              <label for="leaveShiftStart">Shift start</label>
+              <input id="leaveShiftStart" type="time" value="06:00">
+            </div>
+            <div>
+              <label for="leaveShiftEnd">Shift end</label>
+              <input id="leaveShiftEnd" type="time" value="12:00">
+            </div>
+            <div>
+              <label for="leaveCoverCoach">Assign shift coverage</label>
+              <select id="leaveCoverCoach">
+                <option value="other">Other / No coach confirmed</option>
+              </select>
+            </div>
+            <div>
+              <label for="leaveReason">Reason</label>
+              <input id="leaveReason" type="text"
+                placeholder="Optional short reason" maxlength="250">
+            </div>
+            <div>
+              <button id="submitLeaveRequestButton" class="refresh-button"
+                type="button">
+                Send Leave Request
+              </button>
+            </div>
+          </div>
+
+          <div id="leaveRequestMessage" class="message"></div>
+
+          <div class="table-card" style="margin-top:18px;">
+            <h3>My Leave Requests</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Shift</th>
+                  <th>Cover</th>
+                  <th>Status</th>
+                  <th>Admin Note</th>
+                </tr>
+              </thead>
+              <tbody id="coachLeaveRequestBody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="card table-card" style="margin-top: 20px;">
           <h3>My Recent Attendance</h3>
           <table>
@@ -903,6 +1098,29 @@
       </div>
 
       <div id="adminDashboard" class="hidden">
+        <dialog id="leaveInboxDialog" class="commission-dialog">
+          <div class="commission-dialog-content">
+            <div class="commission-dialog-header">
+              <div>
+                <h3>Coach Leave Requests</h3>
+                <p class="location-text">
+                  Approve or decline each request. Approved named cover coaches
+                  are added automatically to payroll shift covers.
+                </p>
+              </div>
+              <button type="button" class="commission-dialog-close"
+                onclick="closeLeaveInbox()" aria-label="Close">
+                Close
+              </button>
+            </div>
+            <div class="leave-inbox-toolbar">
+              <button id="refreshLeaveInboxButton" type="button"
+                class="refresh-button">Refresh</button>
+            </div>
+            <div id="leaveInboxMessage" class="message"></div>
+            <div id="leaveRequestList"></div>
+          </div>
+        </dialog>
         <div class="admin-tabs no-print" role="tablist" aria-label="Admin sections">
           <button
             id="attendanceTabButton"
@@ -1375,6 +1593,9 @@
     let adminPayrollSettings = [];
     let adminShiftCovers = [];
     let adminMembershipCommissions = [];
+    let coachLeaveRequests = [];
+    let adminLeaveRequests = [];
+    let leaveRequestPoller = null;
 
     const loginScreen = document.getElementById("loginScreen");
     const appScreen = document.getElementById("appScreen");
@@ -1597,9 +1818,11 @@
         coachDashboard.classList.add("hidden");
         restoreAdminTab();
         await loadAdminDashboard();
+        startLeaveRequestPolling();
       } else {
         coachDashboard.classList.remove("hidden");
         adminDashboard.classList.add("hidden");
+        document.getElementById("leaveInboxButton").classList.add("hidden");
         await loadCoachDashboard();
       }
     }
@@ -1659,6 +1882,11 @@
           locationWatcher = null;
         }
 
+        if (leaveRequestPoller !== null) {
+          clearInterval(leaveRequestPoller);
+          leaveRequestPoller = null;
+        }
+
         await db.auth.signOut();
         currentUser = null;
         currentProfile = null;
@@ -1678,6 +1906,7 @@
       openAttendance = data || null;
       updateCoachStatus();
       await loadCoachHistory();
+      await initializeLeaveRequestModule();
 
       if (openAttendance) {
         startLiveLocationTracking();
@@ -1912,6 +2141,318 @@
         `;
     }
 
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, character => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[character]);
+    }
+
+    function formatLeaveTime(value) {
+      const parts = String(value || "").split(":");
+      const hour = Number(parts[0]);
+      const minute = Number(parts[1] || 0);
+      if (!Number.isFinite(hour)) return "—";
+      const suffix = hour >= 12 ? "PM" : "AM";
+      const displayHour = hour % 12 || 12;
+      return displayHour + ":" + String(minute).padStart(2, "0") + " " + suffix;
+    }
+
+    function formatLeaveDate(value) {
+      if (!value) return "—";
+      return new Date(value + "T00:00:00+05:30").toLocaleDateString(
+        "en-LK",
+        { timeZone: "Asia/Colombo", year: "numeric", month: "short", day: "numeric" }
+      );
+    }
+
+    function leaveStatusHtml(status) {
+      const safeStatus = ["pending", "approved", "declined"].includes(status)
+        ? status
+        : "pending";
+      return '<span class="leave-status ' + safeStatus + '">' +
+        escapeHtml(safeStatus) + "</span>";
+    }
+
+    function coachNameById(id) {
+      return adminCoaches.find(coach => coach.id === id)?.full_name || "Other";
+    }
+
+    async function initializeLeaveRequestModule() {
+      const message = document.getElementById("leaveRequestMessage");
+      const coverSelect = document.getElementById("leaveCoverCoach");
+      const leaveDate = document.getElementById("leaveDate");
+
+      if (!leaveDate.value) {
+        leaveDate.value = colomboDateKey(new Date());
+        leaveDate.min = colomboDateKey(new Date());
+      }
+
+      const { data: coaches, error: coachError } = await db
+        .from("profiles")
+        .select("id, full_name, active")
+        .eq("role", "coach")
+        .eq("active", true)
+        .order("full_name");
+
+      if (!coachError) {
+        const selected = coverSelect.value || "other";
+        coverSelect.innerHTML =
+          '<option value="other">Other / No coach confirmed</option>' +
+          (coaches || [])
+            .filter(coach => coach.id !== currentUser.id)
+            .map(coach =>
+              '<option value="' + escapeHtml(coach.id) + '">' +
+              escapeHtml(coach.full_name) + "</option>"
+            ).join("");
+        coverSelect.value = [...coverSelect.options].some(
+          option => option.value === selected
+        ) ? selected : "other";
+      }
+
+      const { data, error } = await db
+        .from("leave_requests")
+        .select("*")
+        .eq("coach_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      if (error) {
+        showMessage(
+          message,
+          "Leave requests need the one-time database setup before they can be used.",
+          "error"
+        );
+        document.getElementById("coachLeaveRequestBody").innerHTML =
+          '<tr><td colspan="5">Leave request setup required.</td></tr>';
+        return;
+      }
+
+      coachLeaveRequests = data || [];
+      renderCoachLeaveRequests(coaches || []);
+    }
+
+    function renderCoachLeaveRequests(coaches) {
+      const coachMap = new Map((coaches || []).map(coach => [
+        coach.id,
+        coach.full_name
+      ]));
+
+      document.getElementById("coachLeaveRequestBody").innerHTML =
+        coachLeaveRequests.map(request => {
+          const coverName = request.coverage_option === "coach"
+            ? (coachMap.get(request.covering_coach_id) || "Selected coach")
+            : "Other";
+          return "<tr>" +
+            "<td>" + escapeHtml(formatLeaveDate(request.leave_date)) + "</td>" +
+            "<td>" + escapeHtml(formatLeaveTime(request.shift_start)) +
+              "–" + escapeHtml(formatLeaveTime(request.shift_end)) + "</td>" +
+            "<td>" + escapeHtml(coverName) + "</td>" +
+            "<td>" + leaveStatusHtml(request.status) + "</td>" +
+            "<td>" + escapeHtml(request.admin_note || "—") + "</td>" +
+          "</tr>";
+        }).join("") ||
+        '<tr><td colspan="5">No leave requests submitted yet.</td></tr>';
+    }
+
+    document.getElementById("submitLeaveRequestButton").addEventListener(
+      "click",
+      async () => {
+        const message = document.getElementById("leaveRequestMessage");
+        clearMessage(message);
+
+        const leaveDate = document.getElementById("leaveDate").value;
+        const shiftStart = document.getElementById("leaveShiftStart").value;
+        const shiftEnd = document.getElementById("leaveShiftEnd").value;
+        const coverValue = document.getElementById("leaveCoverCoach").value;
+        const reason = document.getElementById("leaveReason").value.trim();
+
+        if (!leaveDate || !shiftStart || !shiftEnd) {
+          showMessage(message, "Enter the leave date and complete shift hours.", "error");
+          return;
+        }
+
+        if (shiftEnd <= shiftStart) {
+          showMessage(message, "Shift end time must be later than shift start time.", "error");
+          return;
+        }
+
+        showMessage(message, "Sending leave request...", "success");
+
+        const { error } = await db.rpc("submit_leave_request", {
+          p_leave_date: leaveDate,
+          p_shift_start: shiftStart,
+          p_shift_end: shiftEnd,
+          p_covering_coach_id: coverValue === "other" ? null : coverValue,
+          p_coverage_option: coverValue === "other" ? "other" : "coach",
+          p_reason: reason || null
+        });
+
+        if (error) {
+          showMessage(
+            message,
+            error.message || "Unable to send the leave request.",
+            "error"
+          );
+          return;
+        }
+
+        document.getElementById("leaveReason").value = "";
+        document.getElementById("leaveCoverCoach").value = "other";
+        await initializeLeaveRequestModule();
+        showMessage(message, "Leave request sent to the admin.", "success");
+      }
+    );
+
+    async function loadAdminLeaveRequests(showErrors = false) {
+      if (currentProfile?.role !== "admin") return;
+
+      const { data, error } = await db
+        .from("leave_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) {
+        if (showErrors) {
+          showMessage(
+            document.getElementById("leaveInboxMessage"),
+            "Leave request setup is not ready. Run the supplied Supabase SQL file.",
+            "error"
+          );
+        }
+        return;
+      }
+
+      adminLeaveRequests = (data || []).sort((a, b) => {
+        if (a.status === "pending" && b.status !== "pending") return -1;
+        if (a.status !== "pending" && b.status === "pending") return 1;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+
+      const pendingCount = adminLeaveRequests.filter(
+        request => request.status === "pending"
+      ).length;
+      const inboxButton = document.getElementById("leaveInboxButton");
+      const badge = document.getElementById("leaveInboxBadge");
+
+      inboxButton.classList.remove("hidden");
+      badge.textContent = String(pendingCount);
+      badge.classList.toggle("hidden", pendingCount === 0);
+      renderAdminLeaveRequests();
+    }
+
+    function renderAdminLeaveRequests() {
+      const list = document.getElementById("leaveRequestList");
+
+      list.innerHTML = adminLeaveRequests.map(request => {
+        const coachName = coachNameById(request.coach_id);
+        const coverName = request.coverage_option === "coach"
+          ? coachNameById(request.covering_coach_id)
+          : "Other / No coach confirmed";
+        const pendingControls = request.status === "pending"
+          ? '<label for="leave-note-' + request.id + '">Admin note (optional)</label>' +
+            '<input id="leave-note-' + request.id + '" type="text" maxlength="250" ' +
+              'placeholder="Reason or note for the coach">' +
+            '<div class="leave-review-actions">' +
+              '<button type="button" class="refresh-button" onclick="reviewLeaveRequest(' +
+                "'" + request.id + "','approved'" + ')">Approve</button>' +
+              '<button type="button" class="decline-button" onclick="reviewLeaveRequest(' +
+                "'" + request.id + "','declined'" + ')">Decline</button>' +
+            "</div>"
+          : (request.admin_note
+              ? "<p><strong>Admin note:</strong> " +
+                escapeHtml(request.admin_note) + "</p>"
+              : "");
+
+        return '<div class="leave-request-card ' + escapeHtml(request.status) + '">' +
+          '<div class="leave-request-header">' +
+            "<strong>" + escapeHtml(coachName) + "</strong>" +
+            leaveStatusHtml(request.status) +
+          "</div>" +
+          "<p><strong>Leave date:</strong> " +
+            escapeHtml(formatLeaveDate(request.leave_date)) + "</p>" +
+          "<p><strong>Shift:</strong> " +
+            escapeHtml(formatLeaveTime(request.shift_start)) + "–" +
+            escapeHtml(formatLeaveTime(request.shift_end)) + "</p>" +
+          "<p><strong>Shift coverage:</strong> " + escapeHtml(coverName) + "</p>" +
+          "<p><strong>Reason:</strong> " + escapeHtml(request.reason || "Not provided") + "</p>" +
+          pendingControls +
+        "</div>";
+      }).join("") ||
+        '<p class="location-text">No leave requests received yet.</p>';
+    }
+
+    window.reviewLeaveRequest = async function(requestId, decision) {
+      const message = document.getElementById("leaveInboxMessage");
+      const noteInput = document.getElementById("leave-note-" + requestId);
+      clearMessage(message);
+      showMessage(
+        message,
+        decision === "approved" ? "Approving request..." : "Declining request...",
+        "success"
+      );
+
+      const { error } = await db.rpc("admin_review_leave_request", {
+        p_request_id: requestId,
+        p_decision: decision,
+        p_admin_note: noteInput?.value.trim() || null
+      });
+
+      if (error) {
+        showMessage(
+          message,
+          error.message || "Unable to review the leave request.",
+          "error"
+        );
+        return;
+      }
+
+      await loadAdminDashboard();
+      showMessage(
+        message,
+        decision === "approved"
+          ? "Leave approved. Named shift coverage was added to payroll automatically."
+          : "Leave request declined.",
+        "success"
+      );
+    };
+
+    window.openLeaveInbox = async function() {
+      clearMessage(document.getElementById("leaveInboxMessage"));
+      await loadAdminLeaveRequests(true);
+      document.getElementById("leaveInboxDialog").showModal();
+    };
+
+    window.closeLeaveInbox = function() {
+      document.getElementById("leaveInboxDialog").close();
+    };
+
+    document.getElementById("leaveInboxButton").addEventListener(
+      "click",
+      openLeaveInbox
+    );
+
+    document.getElementById("refreshLeaveInboxButton").addEventListener(
+      "click",
+      () => loadAdminLeaveRequests(true)
+    );
+
+    function startLeaveRequestPolling() {
+      if (leaveRequestPoller !== null) {
+        clearInterval(leaveRequestPoller);
+      }
+      leaveRequestPoller = setInterval(() => {
+        if (currentProfile?.role === "admin") {
+          loadAdminLeaveRequests(false);
+        }
+      }, 30000);
+    }
+
     async function loadAdminDashboard() {
       const [
         profilesResult,
@@ -2031,6 +2572,7 @@
 
       initializeManualCheckIn();
       initializeMonthlyReport();
+      await loadAdminLeaveRequests(false);
       await initializePayrollModule();
     }
 
