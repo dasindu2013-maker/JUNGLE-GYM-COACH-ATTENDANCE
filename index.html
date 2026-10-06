@@ -952,10 +952,11 @@
         </div>
 
         <div class="card" style="margin-bottom:20px;">
-          <h3>Manual Coach Check-In</h3>
+          <h3>Add Forgotten Attendance</h3>
           <p class="location-text">
-            Use this when an admin needs to start a coach's attendance session.
-            No GPS location is recorded for a manual check-in.
+            Enter the coach's actual check-in time. Add a checkout time to save
+            a complete past session, or leave checkout blank to start an active
+            manual check-in. No GPS location is recorded.
           </p>
 
           <div class="correction-form">
@@ -972,8 +973,13 @@
             </div>
 
             <div>
+              <label for="manualCheckOutTime">Checkout time (optional)</label>
+              <input id="manualCheckOutTime" type="datetime-local">
+            </div>
+
+            <div>
               <button id="manualCheckInButton" class="refresh-button">
-                Manual Check In
+                Add Attendance
               </button>
             </div>
           </div>
@@ -2093,10 +2099,12 @@
         }
 
         const coachId = document.getElementById("manualCoach").value;
-        const timeValue =
+        const checkInValue =
           document.getElementById("manualCheckInTime").value;
+        const checkOutValue =
+          document.getElementById("manualCheckOutTime").value;
 
-        if (!coachId || !timeValue) {
+        if (!coachId || !checkInValue) {
           showMessage(
             message,
             "Select a coach and enter the check-in time.",
@@ -2112,57 +2120,81 @@
           return;
         }
 
-        const alreadyOpen = adminAttendance.some(
-          record => record.coach_id === coachId && !record.check_out_time
-        );
+        const checkInIso = sriLankaInputToIso(checkInValue);
+        const checkOutIso = checkOutValue
+          ? sriLankaInputToIso(checkOutValue)
+          : null;
+        const checkInDate = new Date(checkInIso);
+        const checkOutDate = checkOutIso ? new Date(checkOutIso) : null;
+        const futureLimit = new Date(Date.now() + 5 * 60000);
 
-        if (alreadyOpen) {
+        if (checkInDate > futureLimit) {
+          showMessage(message, "Check-in time cannot be in the future.", "error");
+          return;
+        }
+
+        if (checkOutDate && checkOutDate > futureLimit) {
+          showMessage(message, "Checkout time cannot be in the future.", "error");
+          return;
+        }
+
+        if (checkOutDate && checkOutDate <= checkInDate) {
           showMessage(
             message,
-            `${coach.full_name} is already checked in. Correct or close the existing session first.`,
+            "Checkout time must be later than check-in time.",
             "error"
           );
           return;
         }
 
-        const checkInIso = sriLankaInputToIso(timeValue);
-
-        if (new Date(checkInIso) > new Date(Date.now() + 5 * 60000)) {
-          showMessage(
-            message,
-            "Check-in time cannot be in the future.",
-            "error"
+        if (!checkOutDate) {
+          const alreadyOpen = adminAttendance.some(
+            record => record.coach_id === coachId && !record.check_out_time
           );
-          return;
+
+          if (alreadyOpen) {
+            showMessage(
+              message,
+              `${coach.full_name} is already checked in. Correct or close the existing session first.`,
+              "error"
+            );
+            return;
+          }
         }
 
-        showMessage(message, "Creating check-in...", "success");
+        const totalMinutes = checkOutDate
+          ? calculateGymMinutes(checkInDate, checkOutDate)
+          : null;
 
-        const { error } = await db
-          .from("attendance")
-          .insert({
-            coach_id: coachId,
-            check_in_time: checkInIso,
-            status: "checked_in"
-          });
+        showMessage(message, "Saving attendance...", "success");
+
+        const { error } = await db.rpc("admin_add_attendance_session", {
+          p_coach_id: coachId,
+          p_check_in: checkInIso,
+          p_check_out: checkOutIso,
+          p_total_minutes: totalMinutes
+        });
 
         if (error) {
-          const text = error.code === "23505"
-            ? "This coach already has an open attendance session."
-            : (error.message || "Unable to create the manual check-in.");
-
-          showMessage(message, text, "error");
+          showMessage(
+            message,
+            error.message || "Unable to save the manual attendance.",
+            "error"
+          );
           return;
         }
 
         document.getElementById("manualCheckInTime").value =
           colomboInputValue(new Date());
+        document.getElementById("manualCheckOutTime").value = "";
 
         await loadAdminDashboard();
 
         showMessage(
           message,
-          `${coach.full_name} was checked in successfully by admin.`,
+          checkOutDate
+            ? `${coach.full_name}'s complete attendance session was added successfully.`
+            : `${coach.full_name} was checked in successfully by admin.`,
           "success"
         );
       }
