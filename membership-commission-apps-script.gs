@@ -3,7 +3,7 @@
  *
  * Commission rules:
  * - New memberships and renewals: 10%
- * - Receipt number "free" (case-insensitive): 0%
+ * - Receipt number beginning with "free" (case-insensitive): 0%
  * - Staff "Alpha" is mapped to Harshana in Coach Payroll.
  *
  * SETUP
@@ -19,7 +19,7 @@
  * protection for every normal receipt number.
  */
 if (
-  normalizeReceipt_(receiptNumber) !== 'free' &&
+  !normalizeReceipt_(receiptNumber).startsWith('free') &&
   receiptExists_(sheet, headers, receiptNumber)
 ) {
   throw new Error(
