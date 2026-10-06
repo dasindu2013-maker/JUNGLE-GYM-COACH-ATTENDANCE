@@ -65,6 +65,25 @@ create unique index if not exists shift_covers_leave_request_unique
   on public.shift_covers (leave_request_id)
   where leave_request_id is not null;
 
+create or replace function public.get_leave_cover_coaches()
+returns table (
+  id uuid,
+  full_name text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $
+  select p.id, p.full_name
+  from public.profiles p
+  where p.role = 'coach'
+    and p.active is not false
+    and p.id <> auth.uid()
+    and lower(trim(p.full_name)) not like 'randy senevir%'
+  order by p.full_name;
+$;
+
 create or replace function public.submit_leave_request(
   p_leave_date date,
   p_shift_start time,
@@ -125,6 +144,15 @@ begin
         and active is not false
     ) then
       raise exception 'The selected covering coach is not active';
+    end if;
+
+    if exists (
+      select 1
+      from public.profiles
+      where id = p_covering_coach_id
+        and lower(trim(full_name)) like 'randy senevir%'
+    ) then
+      raise exception 'Randy Senevirathna cannot be selected for shift coverage';
     end if;
   else
     p_covering_coach_id := null;
@@ -258,6 +286,12 @@ begin
   return v_request;
 end;
 $$;
+
+revoke all on function public.get_leave_cover_coaches()
+from public;
+
+grant execute on function public.get_leave_cover_coaches()
+to authenticated;
 
 revoke all on function public.submit_leave_request(
   date, time, time, uuid, text, text
