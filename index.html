@@ -998,7 +998,7 @@
           <h3>Coach Payroll</h3>
           <p class="location-text">
             Monthly salary calculation based on scheduled hours, attendance,
-            approved extra hours and approved shift covers.
+            and approved shift covers.
           </p>
 
           <div id="payrollMessage" class="message"></div>
@@ -1009,10 +1009,11 @@
             the system recommends an attendance adjustment equal to the
             percentage-point shortfall, capped at 30% of basic salary.
             Attendance of 90%–94.99% earns a 5% bonus and 95%+ earns a 10%
-            bonus. Approved overtime and shift-cover hours are paid at 1.5×
-            the calculated hourly rate. Short-notice covers add Rs. 500 each,
-            and 3 or more approved covers in the month add a Rs. 1,000 team
-            support bonus. All rates remain editable in Supabase.
+            bonus. Normal extra hours do not receive overtime pay. Only an
+            approved shift covering another coach is paid using the configured
+            shift-cover multiplier. Short-notice covers add Rs. 500 each, and
+            3 or more approved covers in the month add a Rs. 1,000 team support
+            bonus. All rates remain editable in Supabase.
           </div>
 
           <div class="report-controls">
@@ -1039,7 +1040,7 @@
                   <th>Basic Salary</th>
                   <th>Scheduled Hrs / Month</th>
                   <th>Min Attendance %</th>
-                  <th>OT / Cover Rate</th>
+                  <th>Shift-Cover Rate</th>
                   <th>Save</th>
                 </tr>
               </thead>
@@ -1100,7 +1101,7 @@
                   <th>Cover Hrs</th>
                   <th>Adjustment</th>
                   <th>Bonus</th>
-                  <th>OT / Cover Pay</th>
+                  <th>Shift Cover Pay</th>
                   <th>Other Cover Benefits</th>
                   <th>Estimated Salary</th>
                   <th>Salary PDF</th>
@@ -2449,7 +2450,7 @@
       const scheduledHours = Number(setting.scheduled_hours_month || 0);
       const baseSalary = Number(setting.base_salary || 0);
       const minimumAttendance = Number(setting.minimum_attendance_pct ?? 70);
-      const multiplier = Number(setting.overtime_multiplier ?? 1.5);
+      const coverMultiplier = Number(setting.overtime_multiplier ?? 1.5);
       const hourlyRate = scheduledHours > 0 ? baseSalary / scheduledHours : 0;
 
       // Cover shifts receive separate benefit and do not hide missed normal shifts.
@@ -2471,9 +2472,9 @@
           Number(setting.attendance_bonus_90_pct ?? 5) / 100;
       }
 
-      const overtimeHours = Math.max(0, regularWorkedHours - scheduledHours);
-      const overtimePay = overtimeHours * hourlyRate * multiplier;
-      const coverPay = coverHours * hourlyRate * multiplier;
+      // Normal hours above the schedule do not receive overtime payment.
+      // Only approved shift-cover hours receive the configured benefit.
+      const coverPay = coverHours * hourlyRate * coverMultiplier;
 
       const shortNoticeCount = covers.filter(item => item.short_notice).length;
       const shortNoticePay =
@@ -2501,8 +2502,6 @@
         coverHours,
         attendanceAdjustment,
         attendanceBonus,
-        overtimeHours,
-        overtimePay,
         coverPay,
         shortNoticeCount,
         shortNoticePay,
@@ -2524,7 +2523,7 @@
             Number(item.setting.minimum_attendance_pct ?? 70);
           const benefitTotal =
             item.shortNoticePay + item.teamSupportPay;
-          const overtimeCoverPay = item.overtimePay + item.coverPay;
+          const shiftCoverPay = item.coverPay;
 
           return `
             <tr>
@@ -2540,8 +2539,8 @@
               <td class="${item.attendanceBonus > 0 ? "payroll-positive" : ""}">
                 ${money(item.attendanceBonus)}
               </td>
-              <td class="${overtimeCoverPay > 0 ? "payroll-positive" : ""}">
-                ${money(overtimeCoverPay)}
+              <td class="${shiftCoverPay > 0 ? "payroll-positive" : ""}">
+                ${money(shiftCoverPay)}
               </td>
               <td class="${benefitTotal > 0 ? "payroll-positive" : ""}">
                 ${money(benefitTotal)}
@@ -2757,11 +2756,10 @@
           ["Attendance %", `${item.attendancePct.toFixed(2)}%`],
           ["Regular Hours Counted", `${item.regularWorkedHours.toFixed(2)} hrs`],
           ["Total Recorded Hours", `${item.workedHours.toFixed(2)} hrs`],
-          ["Overtime Hours", `${item.overtimeHours.toFixed(2)} hrs`],
           ["Approved Shift Cover Hours", `${item.coverHours.toFixed(2)} hrs`],
           ["Approved Shift Covers", String(covers.length)],
           ["Short-Notice Covers", String(item.shortNoticeCount)],
-          ["OT / Shift-Cover Multiplier", `${Number(item.setting.overtime_multiplier ?? 1.5).toFixed(2)}x`]
+          ["Shift-Cover Multiplier", `${Number(item.setting.overtime_multiplier ?? 1.5).toFixed(2)}x`]
         ],
         headStyles: {
           fillColor: green,
@@ -2787,9 +2785,6 @@
           : money(0)],
         ["Attendance Bonus", item.attendanceBonus > 0
           ? `+ ${money(item.attendanceBonus)}`
-          : money(0)],
-        ["Overtime Payment", item.overtimePay > 0
-          ? `+ ${money(item.overtimePay)}`
           : money(0)],
         ["Shift Cover Payment", item.coverPay > 0
           ? `+ ${money(item.coverPay)}`
@@ -2935,7 +2930,6 @@
           "Shift Cover Hours",
           "Attendance Adjustment",
           "Attendance Bonus",
-          "Overtime Pay",
           "Shift Cover Pay",
           "Short Notice Benefit",
           "Team Support Bonus",
@@ -2949,7 +2943,6 @@
           item.coverHours.toFixed(2),
           item.attendanceAdjustment.toFixed(2),
           item.attendanceBonus.toFixed(2),
-          item.overtimePay.toFixed(2),
           item.coverPay.toFixed(2),
           item.shortNoticePay.toFixed(2),
           item.teamSupportPay.toFixed(2),
