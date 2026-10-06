@@ -1340,48 +1340,6 @@
             </table>
           </div>
 
-          <div style="margin-top:22px;">
-            <h3>Add Approved Shift Cover</h3>
-            <div class="correction-form">
-              <div>
-                <label for="coveringCoach">Covering Coach</label>
-                <select id="coveringCoach">
-                  <option value="">Select coach</option>
-                </select>
-              </div>
-              <div>
-                <label for="absentCoach">Coach Being Covered</label>
-                <select id="absentCoach">
-                  <option value="">Select coach</option>
-                </select>
-              </div>
-              <div>
-                <label for="coverDate">Cover Date</label>
-                <input id="coverDate" type="date">
-              </div>
-              <div>
-                <label for="coverHours">Hours Covered</label>
-                <input id="coverHours" type="number" min="0.5" step="0.5" value="5">
-              </div>
-              <div>
-                <label>Short Notice</label>
-                <div class="checkbox-row">
-                  <input id="shortNoticeCover" type="checkbox">
-                  <span>Requested within 24 hours</span>
-                </div>
-              </div>
-              <div>
-                <label for="coverNotes">Notes</label>
-                <input id="coverNotes" type="text" placeholder="Optional">
-              </div>
-              <div>
-                <button id="saveShiftCoverButton" class="refresh-button">
-                  Add Shift Cover
-                </button>
-              </div>
-            </div>
-          </div>
-
           <div class="table-card" style="margin-top:22px;">
             <h3>Monthly Payroll Summary</h3>
             <table>
@@ -1421,7 +1379,10 @@
           </dialog>
 
           <div class="table-card" style="margin-top:22px;">
-            <h3>Approved Shift Covers</h3>
+            <h3>Shift Coverage Records</h3>
+            <p class="location-text">
+              Approved leave requests with a named covering coach appear here automatically.
+            </p>
             <table>
               <thead>
                 <tr>
@@ -2903,19 +2864,6 @@
       if (error) throw error;
     }
 
-    function populatePayrollCoachLists() {
-      const options = adminCoaches
-        .filter(coach => coach.active !== false)
-        .sort((a, b) => a.full_name.localeCompare(b.full_name))
-        .map(coach => `<option value="${coach.id}">${coach.full_name}</option>`)
-        .join("");
-
-      document.getElementById("coveringCoach").innerHTML =
-        '<option value="">Select coach</option>' + options;
-      document.getElementById("absentCoach").innerHTML =
-        '<option value="">Select coach</option>' + options;
-    }
-
     async function initializePayrollModule() {
       const message = document.getElementById("payrollMessage");
       const monthInput = document.getElementById("payrollMonth");
@@ -2924,11 +2872,6 @@
         monthInput.value = colomboDateKey(new Date()).slice(0, 7);
       }
 
-      if (!document.getElementById("coverDate").value) {
-        document.getElementById("coverDate").value = colomboDateKey(new Date());
-      }
-
-      populatePayrollCoachLists();
       clearMessage(message);
 
       const [settingsResult, coversResult, commissionsResult] = await Promise.all([
@@ -3313,51 +3256,8 @@
             <td>${item.short_notice ? "Yes" : "No"}</td>
             <td>${item.notes || "—"}</td>
           </tr>
-        `).join("") || '<tr><td colspan="6">No approved shift covers for this month.</td></tr>';
+        `).join("") || '<tr><td colspan="6">No approved named shift coverage for this month.</td></tr>';
     }
-
-    document.getElementById("saveShiftCoverButton").addEventListener(
-      "click",
-      async () => {
-        const message = document.getElementById("payrollMessage");
-        const coveringCoach = document.getElementById("coveringCoach").value;
-        const absentCoach = document.getElementById("absentCoach").value;
-        const coverDate = document.getElementById("coverDate").value;
-        const coverHours = Number(document.getElementById("coverHours").value || 0);
-        const shortNotice = document.getElementById("shortNoticeCover").checked;
-        const notes = document.getElementById("coverNotes").value.trim();
-
-        if (!coveringCoach || !absentCoach || !coverDate || coverHours <= 0) {
-          showMessage(message, "Complete all required shift-cover fields.", "error");
-          return;
-        }
-
-        if (coveringCoach === absentCoach) {
-          showMessage(message, "Covering coach and absent coach must be different.", "error");
-          return;
-        }
-
-        const { error } = await db.from("shift_covers").insert({
-          covering_coach_id: coveringCoach,
-          absent_coach_id: absentCoach,
-          cover_date: coverDate,
-          cover_hours: coverHours,
-          short_notice: shortNotice,
-          approved: true,
-          notes: notes || null
-        });
-
-        if (error) {
-          showMessage(message, error.message || "Unable to save shift cover.", "error");
-          return;
-        }
-
-        document.getElementById("coverNotes").value = "";
-        document.getElementById("shortNoticeCover").checked = false;
-        showMessage(message, "Shift cover added and payroll recalculated.", "success");
-        await initializePayrollModule();
-      }
-    );
 
     async function salaryPdfLogoDataUrl() {
       const response = await fetch("jungle-gym-logo.png");
