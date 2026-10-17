@@ -1557,6 +1557,7 @@
     let coachLeaveRequests = [];
     let adminLeaveRequests = [];
     let leaveRequestPoller = null;
+    let adminAttendancePoller = null;
 
     const loginScreen = document.getElementById("loginScreen");
     const appScreen = document.getElementById("appScreen");
@@ -1780,6 +1781,7 @@
         restoreAdminTab();
         await loadAdminDashboard();
         startLeaveRequestPolling();
+        startAdminAttendancePolling();
       } else {
         coachDashboard.classList.remove("hidden");
         adminDashboard.classList.add("hidden");
@@ -1848,6 +1850,11 @@
           leaveRequestPoller = null;
         }
 
+        if (adminAttendancePoller !== null) {
+          clearInterval(adminAttendancePoller);
+          adminAttendancePoller = null;
+        }
+
         await db.auth.signOut();
         currentUser = null;
         currentProfile = null;
@@ -1857,12 +1864,24 @@
     );
 
     async function loadCoachDashboard() {
-      const { data } = await db
+      const { data, error } = await db
         .from("attendance")
         .select("*")
         .eq("coach_id", currentUser.id)
         .is("check_out_time", null)
+        .order("check_in_time", { ascending: false })
+        .limit(1)
         .maybeSingle();
+
+      if (error) {
+        const message = document.getElementById("attendanceMessage");
+        showMessage(
+          message,
+          "Unable to verify attendance status. Please check your connection and reload.",
+          "error"
+        );
+        throw error;
+      }
 
       openAttendance = data || null;
       updateCoachStatus();
@@ -1943,7 +1962,9 @@
       "click",
       async () => {
         const message = document.getElementById("attendanceMessage");
+        const button = document.getElementById("checkInButton");
         clearMessage(message);
+        button.disabled = true;
 
         try {
           showMessage(message, "Checking your location...", "success");
@@ -1963,6 +1984,11 @@
             .single();
 
           if (error) throw error;
+          if (!data?.id) {
+            throw new Error(
+              "Supabase did not confirm the check-in. Please try again."
+            );
+          }
 
           openAttendance = data;
 
@@ -1973,7 +1999,7 @@
 
           showMessage(
             message,
-            "Check-in recorded successfully.",
+            "Check-in saved and confirmed successfully.",
             "success"
           );
         } catch (error) {
@@ -1982,6 +2008,8 @@
             error.message || "Unable to check in.",
             "error"
           );
+        } finally {
+          button.disabled = false;
         }
       }
     );
@@ -1990,9 +2018,21 @@
       "click",
       async () => {
         const message = document.getElementById("attendanceMessage");
+        const button = document.getElementById("checkOutButton");
         clearMessage(message);
+        button.disabled = true;
 
         try {
+          if (!openAttendance?.id) {
+            await loadCoachDashboard();
+          }
+
+          if (!openAttendance?.id) {
+            throw new Error(
+              "No active attendance session was found. Please reload the page."
+            );
+          }
+
           showMessage(message, "Checking your location...", "success");
 
           const location = await getVerifiedGymLocation();
@@ -2004,7 +2044,7 @@
             checkoutTime
           );
 
-          const { error } = await db
+          const { data: updatedAttendance, error } = await db
             .from("attendance")
             .update({
               check_out_time: checkoutTime.toISOString(),
@@ -2014,9 +2054,18 @@
               total_minutes: totalMinutes,
               status: "checked_out"
             })
-            .eq("id", openAttendance.id);
+            .eq("id", openAttendance.id)
+            .eq("coach_id", currentUser.id)
+            .is("check_out_time", null)
+            .select()
+            .single();
 
           if (error) throw error;
+          if (!updatedAttendance?.check_out_time) {
+            throw new Error(
+              "Supabase did not confirm the check-out. Please try again."
+            );
+          }
 
           if (locationWatcher !== null) {
             navigator.geolocation.clearWatch(locationWatcher);
@@ -2029,15 +2078,19 @@
 
           showMessage(
             message,
-            "Check-out recorded successfully.",
+            "Check-out saved and confirmed successfully.",
             "success"
           );
         } catch (error) {
+          await loadCoachDashboard().catch(() => {});
           showMessage(
             message,
-            error.message || "Unable to check out.",
+            error.message ||
+              "Check-out was not saved. Please try again or contact the admin.",
             "error"
           );
+        } finally {
+          button.disabled = false;
         }
       }
     );
@@ -2410,6 +2463,23 @@
       }, 30000);
     }
 
+    function startAdminAttendancePolling() {
+      if (adminAttendancePoller !== null) {
+        clearInterval(adminAttendancePoller);
+      }
+
+      adminAttendancePoller = setInterval(() => {
+        if (
+          currentProfile?.role === "admin" &&
+          !document.hidden
+        ) {
+          loadAdminDashboard().catch(error => {
+            console.error("Automatic attendance refresh failed:", error);
+          });
+        }
+      }, 30000);
+    }
+
     async function loadAdminDashboard() {
       const [
         profilesResult,
@@ -2423,6 +2493,19 @@
         db.from("live_locations")
           .select("*, profiles(full_name)")
       ]);
+
+      if (
+        profilesResult.error ||
+        attendanceResult.error ||
+        locationsResult.error
+      ) {
+        const error =
+          profilesResult.error ||
+          attendanceResult.error ||
+          locationsResult.error;
+        console.error("Admin attendance refresh failed:", error);
+        throw error;
+      }
 
       const coaches = profilesResult.data || [];
       const attendance = attendanceResult.data || [];
