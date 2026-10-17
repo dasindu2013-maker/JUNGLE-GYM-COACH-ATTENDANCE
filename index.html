@@ -751,6 +751,27 @@
       margin-bottom: 10px;
     }
 
+    .commission-correction-table select,
+    .commission-correction-table input {
+      min-width: 165px;
+      padding: 9px;
+      color: white;
+      background: #0e120e;
+      border: 1px solid #394339;
+      border-radius: 8px;
+    }
+
+    .correction-badge {
+      display: inline-block;
+      margin-top: 5px;
+      padding: 4px 7px;
+      border-radius: 999px;
+      color: #baff9f;
+      background: rgba(101, 211, 60, 0.14);
+      font-size: 11px;
+      font-weight: bold;
+    }
+
     @page {
       size: A4 landscape;
       margin: 12mm;
@@ -1377,6 +1398,29 @@
               <div id="commissionReceiptList"></div>
             </div>
           </dialog>
+
+          <div class="table-card" style="margin-top:22px;">
+            <h3>Correct Membership Commission Coach</h3>
+            <p class="location-text">
+              If the wrong staff member was selected during registration, choose
+              the correct coach and move the commission. The receipt and member
+              information remain unchanged, and the correction is recorded.
+            </p>
+            <table class="commission-correction-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Member / Receipt</th>
+                  <th>Current Staff</th>
+                  <th>Commission</th>
+                  <th>Move to Coach</th>
+                  <th>Reason</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="commissionCorrectionBody"></tbody>
+            </table>
+          </div>
 
           <div class="table-card" style="margin-top:22px;">
             <h3>Shift Coverage Records</h3>
@@ -3022,6 +3066,7 @@
 
       renderPayrollSettings();
       renderPayrollSummary();
+      renderMembershipCommissionCorrections();
       renderShiftCovers();
     }
 
@@ -3320,6 +3365,162 @@
 
     window.closeCommissionReceipts = function() {
       document.getElementById("commissionDialog").close();
+    };
+
+    function renderMembershipCommissionCorrections() {
+      const body = document.getElementById("commissionCorrectionBody");
+      if (!body) return;
+
+      const month = document.getElementById("payrollMonth").value;
+      const coaches = adminCoaches
+        .filter(coach => coach.active !== false)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
+      const records = adminMembershipCommissions
+        .filter(item =>
+          String(item.payment_date || "").startsWith(month) &&
+          Number(item.commission_amount || 0) > 0
+        )
+        .sort((a, b) =>
+          String(b.payment_date || "").localeCompare(
+            String(a.payment_date || "")
+          )
+        );
+
+      body.innerHTML = records.map(item => {
+        const currentName = payrollCommissionName(item.staff_name);
+        const options = coaches.map(coach => {
+          const selected =
+            payrollCommissionName(coach.full_name) === currentName
+              ? " selected"
+              : "";
+          return `<option value="${escapeHtml(coach.id)}"${selected}>
+            ${escapeHtml(coach.full_name)}
+          </option>`;
+        }).join("");
+
+        const correctionStatus = item.manual_staff_override
+          ? `<span class="correction-badge">
+              Corrected from ${escapeHtml(item.original_staff_name || "Unknown")}
+            </span>`
+          : "";
+
+        return `
+          <tr>
+            <td>${escapeHtml(item.payment_date || "—")}</td>
+            <td>
+              <strong>${escapeHtml(item.member_name || "Member name unavailable")}</strong>
+              <br>
+              <span class="location-text">
+                Receipt: ${escapeHtml(item.receipt_number || "—")}
+              </span>
+            </td>
+            <td>
+              ${escapeHtml(item.staff_name || "—")}
+              <br>${correctionStatus}
+            </td>
+            <td>${money(item.commission_amount)}</td>
+            <td>
+              <select id="commission-coach-${item.id}">
+                ${options}
+              </select>
+            </td>
+            <td>
+              <input id="commission-reason-${item.id}" type="text"
+                maxlength="250" placeholder="Selection entered incorrectly">
+            </td>
+            <td>
+              <button class="edit-button" type="button"
+                onclick="reassignMembershipCommission('${item.id}')">
+                Move Commission
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("") || `
+        <tr>
+          <td colspan="7">
+            No commission-earning membership registrations for this month.
+          </td>
+        </tr>
+      `;
+    }
+
+    window.reassignMembershipCommission = async function(commissionId) {
+      const message = document.getElementById("payrollMessage");
+      clearMessage(message);
+
+      if (currentProfile?.role !== "admin") {
+        showMessage(message, "Only an admin can correct commissions.", "error");
+        return;
+      }
+
+      const record = adminMembershipCommissions.find(
+        item => String(item.id) === String(commissionId)
+      );
+      const select = document.getElementById(
+        `commission-coach-${commissionId}`
+      );
+      const reasonInput = document.getElementById(
+        `commission-reason-${commissionId}`
+      );
+      const coach = coachById(select?.value);
+
+      if (!record || !coach) {
+        showMessage(
+          message,
+          "Select the correct coach for this registration.",
+          "error"
+        );
+        return;
+      }
+
+      if (
+        payrollCommissionName(record.staff_name) ===
+        payrollCommissionName(coach.full_name)
+      ) {
+        showMessage(
+          message,
+          "This registration is already assigned to that coach.",
+          "error"
+        );
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Move receipt ${record.receipt_number || "—"} from ` +
+        `${record.staff_name} to ${coach.full_name}?`
+      );
+
+      if (!confirmed) return;
+
+      showMessage(message, "Moving membership commission...", "success");
+
+      const { error } = await db.rpc(
+        "admin_reassign_membership_commission",
+        {
+          p_commission_id: Number(commissionId),
+          p_new_coach_id: coach.id,
+          p_reason: reasonInput?.value.trim() || null
+        }
+      );
+
+      if (error) {
+        showMessage(
+          message,
+          error.message ||
+            "Unable to move the membership commission.",
+          "error"
+        );
+        return;
+      }
+
+      await initializePayrollModule();
+      showMessage(
+        message,
+        `Receipt ${record.receipt_number || "—"} was moved to ` +
+          `${coach.full_name}. Payroll has been recalculated.`,
+        "success"
+      );
     };
 
     function renderShiftCovers() {
@@ -3747,6 +3948,7 @@
       "change",
       () => {
         renderPayrollSummary();
+        renderMembershipCommissionCorrections();
         renderShiftCovers();
       }
     );
