@@ -1664,6 +1664,33 @@
       element.className = "message";
     }
 
+    async function ensureCurrentAccountActive() {
+      const { data: profile, error } = await db
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .single();
+
+      if (error) {
+        throw new Error(
+          "Unable to verify your account status. Please try again."
+        );
+      }
+
+      if (!profile?.active) {
+        alert(
+          "Your Jungle Gym coach account is inactive. " +
+          "Please contact the administrator."
+        );
+        await db.auth.signOut();
+        showLogin();
+        return false;
+      }
+
+      currentProfile = profile;
+      return true;
+    }
+
     function formatDateTime(value) {
       if (!value) return "—";
 
@@ -2011,6 +2038,8 @@
         button.disabled = true;
 
         try {
+          if (!(await ensureCurrentAccountActive())) return;
+
           showMessage(message, "Checking your location...", "success");
 
           const location = await getVerifiedGymLocation();
@@ -2067,6 +2096,8 @@
         button.disabled = true;
 
         try {
+          if (!(await ensureCurrentAccountActive())) return;
+
           if (!openAttendance?.id) {
             await loadCoachDashboard();
           }
@@ -2325,6 +2356,17 @@
         const coverValue = document.getElementById("leaveCoverCoach").value;
         const reason = document.getElementById("leaveReason").value.trim();
 
+        try {
+          if (!(await ensureCurrentAccountActive())) return;
+        } catch (error) {
+          showMessage(
+            message,
+            error.message || "Unable to verify your account status.",
+            "error"
+          );
+          return;
+        }
+
         if (!leaveDate || !shiftStart || !shiftEnd) {
           showMessage(message, "Enter the leave date and complete shift hours.", "error");
           return;
@@ -2552,6 +2594,7 @@
       }
 
       const coaches = profilesResult.data || [];
+      const activeCoaches = coaches.filter(coach => coach.active !== false);
       const attendance = attendanceResult.data || [];
       const locations = locationsResult.data || [];
 
@@ -2577,7 +2620,7 @@
       });
 
       document.getElementById("totalCoaches").textContent =
-        coaches.length;
+        activeCoaches.length;
 
       document.getElementById("checkedInCount").textContent =
         openRecords.length;
@@ -2586,7 +2629,7 @@
         todaysRecords.length;
 
       document.getElementById("liveStatusBody").innerHTML =
-        coaches.map(coach => {
+        activeCoaches.map(coach => {
           const openRecord = openRecords.find(
             record => record.coach_id === coach.id
           );
