@@ -1400,13 +1400,15 @@
           </dialog>
 
           <div class="table-card" style="margin-top:22px;">
-            <h3>Correct Membership Commission Coach</h3>
+            <h3>Correct or Cancel Membership Commissions</h3>
             <p class="location-text">
               If the wrong staff member was selected during registration, choose
               the correct coach and move the commission. The receipt and member
-              information remain unchanged, and the correction is recorded.
+              information remain unchanged, and the correction is recorded. For a duplicate
+              registration, enter a reason and choose Cancel Commission to remove it
+              from payroll. Cancellation history is retained.
             </p>
-            <table class="commission-correction-table">
+            <div style="overflow-x:auto;"><table class="commission-correction-table">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -1419,7 +1421,14 @@
                 </tr>
               </thead>
               <tbody id="commissionCorrectionBody"></tbody>
-            </table>
+            </table></div>
+            <details style="margin-top:18px;">
+              <summary>Cancelled commissions — selected payment month</summary>
+              <div style="overflow-x:auto;margin-top:12px;"><table>
+                <thead><tr><th>Member / Receipt</th><th>Coach</th><th>Removed commission</th><th>Reason</th><th>Cancelled at</th></tr></thead>
+                <tbody id="cancelledCommissionBody"></tbody>
+              </table></div>
+            </details>
           </div>
 
           <div class="table-card" style="margin-top:22px;">
@@ -3215,7 +3224,8 @@
 
       return adminMembershipCommissions.filter(item =>
         String(item.payment_date || "").startsWith(month) &&
-        payrollCommissionName(item.staff_name) === coachName
+        payrollCommissionName(item.staff_name) === coachName &&
+        !item.cancelled_at
       );
     }
 
@@ -3411,6 +3421,7 @@
     };
 
     function renderMembershipCommissionCorrections() {
+      renderCancelledMembershipCommissions();
       const body = document.getElementById("commissionCorrectionBody");
       if (!body) return;
 
@@ -3421,7 +3432,8 @@
       const records = adminMembershipCommissions
         .filter(item =>
           String(item.payment_date || "").startsWith(month) &&
-          Number(item.commission_amount || 0) > 0
+          Number(item.commission_amount || 0) > 0 &&
+          !item.cancelled_at
         )
         .sort((a, b) =>
           String(b.payment_date || "").localeCompare(
@@ -3469,12 +3481,17 @@
             </td>
             <td>
               <input id="commission-reason-${item.id}" type="text"
-                maxlength="250" placeholder="Selection entered incorrectly">
+                maxlength="250" placeholder="Reason for correction or cancellation">
             </td>
             <td>
               <button class="edit-button" type="button"
                 onclick="reassignMembershipCommission('${item.id}')">
                 Move Commission
+              </button>
+              <button class="edit-button" type="button" style="margin-top:8px;color:#ffaaa8;border-color:#a44;"
+                id="cancel-commission-${item.id}"
+                onclick="cancelMembershipCommission('${item.id}')">
+                Cancel Commission
               </button>
             </td>
           </tr>
@@ -3487,6 +3504,76 @@
         </tr>
       `;
     }
+
+    function renderCancelledMembershipCommissions() {
+      const body = document.getElementById("cancelledCommissionBody");
+      if (!body) return;
+      const month = document.getElementById("payrollMonth").value;
+      const records = adminMembershipCommissions.filter(item => item.cancelled_at && String(item.payment_date || "").startsWith(month));
+      body.innerHTML = records.map(item => `<tr>
+        <td>${escapeHtml(item.member_name || "—")}<br>Receipt: ${escapeHtml(item.receipt_number || "—")}</td>
+        <td>${escapeHtml(item.staff_name || "—")}</td>
+        <td>${money(item.commission_before_cancellation)}</td>
+        <td>${escapeHtml(item.cancellation_reason || "—")}</td>
+        <td>${escapeHtml(formatDateTime(item.cancelled_at))}</td>
+      </tr>`).join("") || '<tr><td colspan="5">No cancelled commissions for this payment month.</td></tr>';
+    }
+
+    const commissionCancellationsInProgress = new Set();
+    window.cancelMembershipCommission = async function(commissionId) {
+      const message = document.getElementById("payrollMessage");
+      clearMessage(message);
+      if (currentProfile?.role !== "admin") {
+        showMessage(message, "Only an administrator can cancel commissions.", "error"); return;
+      }
+      const id = Number(commissionId);
+      const record = adminMembershipCommissions.find(item => String(item.id) === String(commissionId));
+      if (!Number.isSafeInteger(id) || !record || record.cancelled_at) {
+        showMessage(message, "Refresh payroll and select an active commission.", "error"); return;
+      }
+      if (commissionCancellationsInProgress.has(id)) return;
+      const reason = document.getElementById(`commission-reason-${commissionId}`)?.value.trim() || "";
+      if (reason.length < 5 || reason.length > 250) {
+        showMessage(message, "Enter a cancellation reason between 5 and 250 characters in the Reason field.", "error"); return;
+      }
+      if (!window.confirm(`Cancel the ${money(record.commission_amount)} commission for receipt ${record.receipt_number || "—"}?\nMember: ${record.member_name || "—"}\nCoach: ${record.staff_name || "—"}\nReason: ${reason}\n\nThis removes it from payroll and retains a cancellation record. The membership itself is unchanged.`)) return;
+      commissionCancellationsInProgress.add(id);
+      const button = document.getElementById(`cancel-commission-${commissionId}`);
+      if (button) button.disabled = true;
+      try {
+        const { error } = await db.rpc("admin_cancel_membership_commission", {
+          p_commission_id: id,
+          p_expected_receipt: record.receipt_number ?? null,
+          p_expected_source_key: record.source_key ?? null,
+          p_expected_staff: record.staff_name ?? null,
+          p_expected_commission: Number(record.commission_amount || 0),
+          p_reason: reason
+        });
+        if (error) throw error;
+        // Immediately exclude it even if the following refresh has a network error.
+        record.cancelled_at = new Date().toISOString();
+        record.commission_before_cancellation = Number(record.commission_amount || 0);
+        record.commission_amount = 0;
+        record.cancellation_reason = reason;
+        renderPayrollSummary();
+        renderMembershipCommissionCorrections();
+        const refreshed = await db.from("membership_commissions").select("*")
+          .order("payment_date", { ascending: false });
+        if (refreshed.error) {
+          showMessage(message, "Cancellation saved. Reload payroll to confirm the latest records; the cancelled commission is excluded locally.", "success");
+          return;
+        }
+        adminMembershipCommissions = refreshed.data || [];
+        renderPayrollSummary();
+        renderMembershipCommissionCorrections();
+        showMessage(message, `Commission for receipt ${record.receipt_number || "—"} was cancelled. It is excluded from payroll; cancellation history is retained.`, "success");
+      } catch (error) {
+        showMessage(message, error.message || "Cancellation failed. Refresh payroll before trying again.", "error");
+      } finally {
+        commissionCancellationsInProgress.delete(id);
+        if (button) button.disabled = false;
+      }
+    };
 
     window.reassignMembershipCommission = async function(commissionId) {
       const message = document.getElementById("payrollMessage");
